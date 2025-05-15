@@ -267,8 +267,8 @@ document.addEventListener("DOMContentLoaded", function() {
       
       // Update button text
       this.innerHTML = state.showPrices 
-        ? '<i class="fas fa-tag"></i> Hide Prices' 
-        : '<i class="fas fa-tag"></i> Show Prices';
+        ? '<i class="fas fa-coins"></i> Hide Prices' 
+        : '<i class="fas fa-coins"></i> Show Prices';
       
       calculateDough();
     });
@@ -281,8 +281,8 @@ document.addEventListener("DOMContentLoaded", function() {
       
       // Update button text
       this.innerHTML = state.showToppingPrices 
-        ? '<i class="fas fa-tag"></i> Hide Prices' 
-        : '<i class="fas fa-tag"></i> Show Prices';
+        ? '<i class="fas fa-coins"></i> Hide Prices' 
+        : '<i class="fas fa-coins"></i> Show Prices';
       
       calculateAllToppings();
     });
