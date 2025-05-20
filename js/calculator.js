@@ -1,5 +1,34 @@
 // Manakish Calculator - Main JavaScript
 
+// Add this near the top of the file, before any other functions
+function debounce(func, wait = 300) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Add this near the top of the file, before any other functions
+const CURRENCY_SYMBOLS = {
+  GBP: '£',
+  USD: '$',
+  EUR: '€'
+};
+
+const CURRENCY_RATES = {
+  GBP: 1,
+  USD: 1.27, // Example rate: 1 GBP = 1.27 USD
+  EUR: 1.17  // Example rate: 1 GBP = 1.17 EUR
+};
+
+function formatPrice(amount, currency = 'GBP') {
+  const symbol = CURRENCY_SYMBOLS[currency];
+  const rate = CURRENCY_RATES[currency];
+  const convertedAmount = amount * rate;
+  return `${symbol}${convertedAmount.toFixed(2)}`;
+}
+
 document.addEventListener("DOMContentLoaded", function() {
   // DOM Cache - Store frequently accessed elements to improve performance
   const domElements = {
@@ -7,17 +36,22 @@ document.addEventListener("DOMContentLoaded", function() {
     tabs: document.querySelectorAll('.tab'),
     tabContents: document.querySelectorAll('.tab-content'),
     
+    // Global price controls
+    globalShowPricesBtn: document.getElementById('globalShowPricesBtn'),
+    globalCurrencySelector: document.getElementById('globalCurrencySelector'),
+    
     // Dough calculator inputs
     doughIngredientsTable: document.getElementById('dough-ingredients-table'),
     ingredientWeights: document.querySelectorAll('.ingredient-weight'),
     totalDoughWeight: document.getElementById('totalDoughWeight'),
     totalDoughCost: document.getElementById('totalDoughCost'),
-    showPricesBtn: document.getElementById('showPricesBtn'),
     
     // Batch calculator
     doughBalls: document.getElementById('doughBalls'),
     ballWeight: document.getElementById('ballWeight'),
     batchResults: document.getElementById('batchResults'),
+    numBatches: document.getElementById('numBatches'),
+    eachBatchWeight: document.getElementById('eachBatchWeight'),
     
     // Recipe analysis
     hydrationValue: document.getElementById('hydrationValue'),
@@ -150,7 +184,9 @@ document.addEventListener("DOMContentLoaded", function() {
     printMeatDetails: document.getElementById('print-meat-details'),
     printBananaTable: document.getElementById('print-banana-table'),
     printBananaDetails: document.getElementById('print-banana-details'),
-    printBoqTable: document.getElementById('print-boq-table')
+    printBoqTable: document.getElementById('print-boq-table'),
+    currencySelector: document.getElementById('currencySelector'),
+    toppingCurrencySelector: document.getElementById('toppingCurrencySelector'),
   };
   
   // State object to hold current calculator values
@@ -175,7 +211,8 @@ document.addEventListener("DOMContentLoaded", function() {
       },
       batch: {
         numBalls: 8,
-        ballWeight: 107
+        ballWeight: 107,
+        numBatches: 1
       }
     },
     toppings: {
@@ -209,81 +246,77 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   };
   
-  // Performance optimization - debounce function to limit calculation frequency
-  function debounce(func, wait = 300) {
-    let timeout;
-    return function(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func.apply(this, args), wait);
-    };
-  }
-  
   // Initialize tabs
   function initTabs() {
     domElements.tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const tabName = tab.getAttribute('data-tab');
-        
-        // Update active tab
-        domElements.tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        
-        // Update active tab content
-        domElements.tabContents.forEach(content => {
-          content.classList.remove('active');
+        tab.addEventListener('click', () => {
+            const tabName = tab.getAttribute('data-tab');
+            
+            // Update active tab
+            domElements.tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update active tab content
+            domElements.tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            const newActiveTab = document.getElementById(`${tabName}-tab`);
+            requestAnimationFrame(() => {
+                newActiveTab.classList.add('active');
+                state.activeTab = tabName;
+                
+                // Only update summary when switching to summary tab
+                if (tabName === 'summary') {
+                    debouncedUpdateSummary();
+                }
+            });
+            
+            // Update URL hash
+            window.location.hash = tabName;
         });
-        
-        document.getElementById(`${tabName}-tab`).classList.add('active');
-        state.activeTab = tabName;
-        
-        // Update summary when switching to summary tab
-        if (tabName === 'summary') {
-          updateSummary();
-        }
-        
-        // Update URL hash
-        window.location.hash = tabName;
-      });
     });
     
     // Check URL hash on load to activate the right tab
     const hash = window.location.hash.substring(1);
     if (hash === 'toppings') {
-      document.querySelector('.tab[data-tab="toppings"]').click();
+        document.querySelector('.tab[data-tab="toppings"]').click();
     } else if (hash === 'summary') {
-      document.querySelector('.tab[data-tab="summary"]').click();
+        document.querySelector('.tab[data-tab="summary"]').click();
     } else if (hash === 'dough') {
-      document.querySelector('.tab[data-tab="dough"]').click();
+        document.querySelector('.tab[data-tab="dough"]').click();
     }
   }
   
   // Price toggle functionality
   function initPriceToggles() {
-    // Dough prices toggle
-    domElements.showPricesBtn.addEventListener('click', function() {
-      state.showPrices = !state.showPrices;
-      this.classList.toggle('active', state.showPrices);
-      document.body.classList.toggle('hidden-prices', !state.showPrices);
+    // Global price toggle for both dough and toppings
+    domElements.globalShowPricesBtn.addEventListener('click', function() {
+      const isActive = this.classList.toggle('active');
+      
+      // Update show/hide state
+      state.showPrices = isActive;
+      state.showToppingPrices = isActive;
+      
+      // Update classes to show/hide prices
+      document.body.classList.toggle('show-prices', isActive);
+      document.body.classList.toggle('hidden-prices', !isActive);
       
       // Update button text
-      this.innerHTML = state.showPrices 
-        ? '<i class="fas fa-coins"></i> Hide Prices' 
-        : '<i class="fas fa-coins"></i> Show Prices';
+      this.innerHTML = isActive
+        ? '<i class="fas fa-coins"></i> <span>Hide Pricing</span>'
+        : '<i class="fas fa-coins"></i> <span>Pricing</span>';
       
-      calculateDough();
-    });
-    
-    // Topping prices toggle
-    domElements.showToppingPricesBtn.addEventListener('click', function() {
-      state.showToppingPrices = !state.showToppingPrices;
-      this.classList.toggle('active', state.showToppingPrices);
-      document.body.classList.toggle('hidden-prices', !state.showToppingPrices);
+      // Display or hide currency selector with improved styling
+      if (isActive) {
+        domElements.globalCurrencySelector.style.display = 'inline-flex';
+        // No need to set explicit height as we've handled this in CSS
+      } else {
+        domElements.globalCurrencySelector.style.display = 'none';
+      }
       
-      // Update button text
-      this.innerHTML = state.showToppingPrices 
-        ? '<i class="fas fa-coins"></i> Hide Prices' 
-        : '<i class="fas fa-coins"></i> Show Prices';
-      
+      // Update all prices and recalculate
+      updateAllPrices();
       calculateAllToppings();
     });
     
@@ -336,6 +369,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Batch calculator
     domElements.doughBalls.addEventListener('input', debounce(updateBatch));
     domElements.ballWeight.addEventListener('input', debounce(updateBatch));
+    domElements.numBatches.addEventListener('input', debounce(updateBatch));
     
     // Initial calculations
     calculateDough();
@@ -403,10 +437,10 @@ document.addEventListener("DOMContentLoaded", function() {
         
         const weight = parseFloat(weightInput.value) || 0;
         const pricePerKg = parseFloat(priceInput.value) || 0;
-        const cost = (weight / 1000) * pricePerKg;
+        const cost = calculateIngredientCost(weight, pricePerKg);
         
-        // Update price display
-        priceDisplay.textContent = `$${cost.toFixed(2)}`;
+        // Update price display with currency
+        updatePriceDisplay(priceDisplay, cost);
         
         // Track specific ingredients for recipe analysis
         const ingredientType = weightInput.getAttribute('data-ingredient');
@@ -430,9 +464,9 @@ document.addEventListener("DOMContentLoaded", function() {
         });
       });
       
-      // Update total weight and cost display
+      // Update total weight and cost display with currency
       domElements.totalDoughWeight.textContent = `${Math.round(state.doughRecipe.totalWeight)}g`;
-      domElements.totalDoughCost.textContent = `$${state.doughRecipe.totalCost.toFixed(2)}`;
+      updatePriceDisplay(domElements.totalDoughCost, state.doughRecipe.totalCost);
       
       // Calculate baker's percentages
       if (flourWeight > 0) {
@@ -441,13 +475,6 @@ document.addEventListener("DOMContentLoaded", function() {
         const oilPercent = (oilWeight / flourWeight) * 100;
         const yeastPercent = (yeastWeight / flourWeight) * 100;
         const sugarPercent = (sugarWeight / flourWeight) * 100;
-        
-        // Update analysis display
-        domElements.hydrationValue.textContent = `${Math.round(hydration)}%`;
-        domElements.saltValue.textContent = `${saltPercent.toFixed(1)}%`;
-        domElements.oilValue.textContent = `${oilPercent.toFixed(1)}%`;
-        domElements.yeastValue.textContent = `${yeastPercent.toFixed(1)}%`;
-        domElements.sugarValue.textContent = `${sugarPercent.toFixed(1)}%`;
         
         // Store in state for later use
         state.doughRecipe.analysis = {
@@ -473,13 +500,19 @@ document.addEventListener("DOMContentLoaded", function() {
     // Get input values
     const numBalls = parseInt(domElements.doughBalls.value) || 0;
     const ballWeight = parseInt(domElements.ballWeight.value) || 0;
+    const numBatches = parseInt(domElements.numBatches.value) || 1;
     
     // Store in state
     state.doughRecipe.batch.numBalls = numBalls;
     state.doughRecipe.batch.ballWeight = ballWeight;
+    state.doughRecipe.batch.numBatches = numBatches;
     
     // Calculate total batch weight
     const totalBatchWeight = numBalls * ballWeight;
+    
+    // Calculate per-batch weight
+    const eachBatchWeight = Math.round(totalBatchWeight / numBatches);
+    domElements.eachBatchWeight.textContent = `${eachBatchWeight}g`;
     
     // Calculate scaling factor
     let scalingFactor = 1;
@@ -487,21 +520,70 @@ document.addEventListener("DOMContentLoaded", function() {
       scalingFactor = totalBatchWeight / state.doughRecipe.totalWeight;
     }
     
+    // Update the Recipe Analysis table with ingredient information
+    const analysisBody = document.getElementById('recipe-analysis-body');
+    analysisBody.innerHTML = ''; // Clear previous rows
+    
+    // Add a row for each ingredient
+    state.doughRecipe.ingredients.forEach(ingredient => {
+      // Calculate scaled weights
+      const scaledWeight = Math.round(ingredient.weight * scalingFactor);
+      const perBatchWeight = Math.round(scaledWeight / numBatches);
+      
+      // Calculate baker's percentage
+      const flourWeight = state.doughRecipe.ingredients.find(i => i.name === 'Bread Flour')?.weight || 1;
+      const percentage = ((ingredient.weight / flourWeight) * 100).toFixed(1);
+      
+      // Create the row
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${ingredient.name}</td>
+        <td>${perBatchWeight}g</td>
+        <td>${scaledWeight}g</td>
+        <td>${percentage}%</td>
+      `;
+      analysisBody.appendChild(row);
+    });
+    
+    // Update the total weights in the analysis table
+    document.getElementById('perBatchWeight').textContent = `${eachBatchWeight}g`;
+    document.getElementById('totalScaledWeight').textContent = `${totalBatchWeight}g`;
+    
     // Generate recipe text for batch
     let batchText = `<strong>Batch Recipe:</strong> Makes ${numBalls} dough balls, ${ballWeight}g each.<br>`;
     batchText += `<strong>Total Batch Weight:</strong> ${totalBatchWeight}g<br>`;
     
+    if (numBatches > 1) {
+      batchText += `<strong>Divided into:</strong> ${numBatches} batches of ${eachBatchWeight}g each<br><br>`;
+    }
+    
     if (scalingFactor !== 1) {
       batchText += `<strong>Ingredients (×${scalingFactor.toFixed(2)}):</strong><br>`;
       
-      state.doughRecipe.ingredients.forEach(ingredient => {
-        const scaledWeight = Math.round(ingredient.weight * scalingFactor);
-        batchText += `${ingredient.name}: ${scaledWeight}g<br>`;
-      });
+      if (numBatches > 1) {
+        batchText += `<strong>Per Batch:</strong><br>`;
+        
+        state.doughRecipe.ingredients.forEach(ingredient => {
+          const scaledWeight = Math.round(ingredient.weight * scalingFactor);
+          const perBatchWeight = Math.round(scaledWeight / numBatches);
+          batchText += `${ingredient.name}: ${perBatchWeight}g per batch (${scaledWeight}g total)<br>`;
+        });
+      } else {
+        state.doughRecipe.ingredients.forEach(ingredient => {
+          const scaledWeight = Math.round(ingredient.weight * scalingFactor);
+          batchText += `${ingredient.name}: ${scaledWeight}g<br>`;
+        });
+      }
       
       if (state.showPrices) {
         const scaledCost = state.doughRecipe.totalCost * scalingFactor;
-        batchText += `<strong>Total Batch Cost:</strong> $${scaledCost.toFixed(2)}`;
+        const currency = domElements.globalCurrencySelector.value;
+        batchText += `<strong>Total Batch Cost:</strong> ${formatPrice(scaledCost, currency)}`;
+        
+        if (numBatches > 1) {
+          const costPerBatch = scaledCost / numBatches;
+          batchText += `<br><strong>Cost per Batch:</strong> ${formatPrice(costPerBatch, currency)}`;
+        }
       }
     }
     
@@ -514,13 +596,12 @@ document.addEventListener("DOMContentLoaded", function() {
   function initZaatarCalculator() {
     // Add event listeners to za'atar inputs
     domElements.zaatarServings.addEventListener('input', debounce(calculateZaatar));
-    domElements.zaatarPerPiece.addEventListener('input', debounce(calculateZaatar));
-    
+
     // Add event listeners to za'atar ingredients
     document.querySelectorAll('#zaatar-ingredients-table input').forEach(input => {
       input.addEventListener('input', debounce(calculateZaatar));
     });
-    
+
     // Add event listeners to remove ingredient buttons
     document.querySelectorAll('#zaatar-ingredients-table .remove-item-button').forEach(button => {
       button.addEventListener('click', function() {
@@ -531,160 +612,133 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       });
     });
-    
+
     // Add custom ingredient button
     domElements.addZaatarIngredient.addEventListener('click', function() {
       domElements.zaatarIngredientForm.style.display = 'block';
       domElements.zaatarIngredientName.focus();
     });
-    
+
     // Save custom ingredient
     domElements.saveZaatarIngredient.addEventListener('click', function() {
       const name = domElements.zaatarIngredientName.value.trim();
       const amount = parseFloat(domElements.zaatarIngredientAmount.value) || 0;
       const price = parseFloat(domElements.zaatarIngredientPrice.value) || 0;
-      
       if (name && amount > 0) {
         addZaatarIngredientRow(name, amount, price);
         resetZaatarIngredientForm();
         calculateZaatar();
       }
     });
-    
+
     // Cancel custom ingredient
     domElements.cancelZaatarIngredient.addEventListener('click', function() {
       resetZaatarIngredientForm();
     });
-    
+
     // Initial calculation
     calculateZaatar();
   }
-  
+
   function resetZaatarIngredientForm() {
     domElements.zaatarIngredientForm.style.display = 'none';
     domElements.zaatarIngredientName.value = '';
     domElements.zaatarIngredientAmount.value = '';
     domElements.zaatarIngredientPrice.value = '';
   }
-  
+
   function addZaatarIngredientRow(name, amount, price) {
     const tbody = document.querySelector('#zaatar-ingredients-table tbody');
     const totalRow = tbody.querySelector('.total-row');
-    
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
       <td>${name}</td>
       <td><input type="number" class="zaatar-ingredient-amount" value="${amount}" min="0"></td>
+      <td class="zaatar-total-amount">0g</td>
       <td class="price-column"><input type="number" class="price-input" value="${price}" min="0" step="0.1"></td>
       <td class="price-column price-display">$0.00</td>
       <td><button class="remove-item-button"><i class="fa fa-trash"></i></button></td>
     `;
-    
-    // Add event listeners to new inputs
     newRow.querySelectorAll('input').forEach(input => {
       input.addEventListener('input', debounce(calculateZaatar));
     });
-    
-    // Add event listener to remove button
     newRow.querySelector('.remove-item-button').addEventListener('click', function() {
       tbody.removeChild(newRow);
       calculateZaatar();
     });
-    
-    // Insert before total row
     tbody.insertBefore(newRow, totalRow);
   }
-  
+
   function calculateZaatar() {
     try {
-      // Clear previous state
       state.toppings.zaatar.ingredients = [];
       state.toppings.zaatar.totalWeight = 0;
       state.toppings.zaatar.totalCost = 0;
       
-      // Get input values
-      const servings = parseInt(domElements.zaatarServings.value) || 0;
-      const perPiece = parseInt(domElements.zaatarPerPiece.value) || 0;
-      
-      // Store in state
-      state.toppings.zaatar.servings = servings;
+      // Use fixed perPiece value since we removed the input field
+      const perPiece = 20; // Default: 20g per piece
       state.toppings.zaatar.perPiece = perPiece;
       
-      // Get all ingredient rows
-      const ingredientRows = document.querySelectorAll('#zaatar-ingredients-table tbody tr:not(.total-row)');
+      const servings = parseInt(domElements.zaatarServings.value) || 0;
+      state.toppings.zaatar.servings = servings;
       
-      // Process each ingredient row
+      const totalNeeded = servings * perPiece;
+      
+      const ingredientRows = document.querySelectorAll('#zaatar-ingredients-table tbody tr:not(.total-row)');
       ingredientRows.forEach(row => {
         const nameCell = row.cells[0].textContent;
         const amountInput = row.querySelector('.zaatar-ingredient-amount');
+        const totalAmountCell = row.querySelector('.zaatar-total-amount');
         const priceInput = row.querySelector('.price-input');
         const priceDisplay = row.querySelector('.price-display');
         
         const amount = parseFloat(amountInput.value) || 0;
+        const totalAmount = amount * servings;
+        
+        // Update total amount cell
+        if (totalAmountCell) totalAmountCell.textContent = totalAmount + 'g';
+        
         const pricePerKg = parseFloat(priceInput.value) || 0;
-        const cost = (amount / 1000) * pricePerKg;
+        const cost = (totalAmount / 1000) * pricePerKg;
+        updatePriceDisplay(priceDisplay, cost);
         
-        // Update price display
-        priceDisplay.textContent = `$${cost.toFixed(2)}`;
-        
-        // Add to total weight and cost
-        state.toppings.zaatar.totalWeight += amount;
+        state.toppings.zaatar.totalWeight += totalAmount;
         state.toppings.zaatar.totalCost += cost;
         
-        // Store ingredient data
         state.toppings.zaatar.ingredients.push({
           name: nameCell,
           amount: amount,
+          totalAmount: totalAmount,
           pricePerKg: pricePerKg,
           cost: cost
         });
       });
       
-      // Update total weight and cost display
+      // Update total weight in UI
       domElements.zaatarMixWeight.textContent = `${Math.round(state.toppings.zaatar.totalWeight)}g`;
-      domElements.zaatarMixCost.textContent = `$${state.toppings.zaatar.totalCost.toFixed(2)}`;
       
-      // Calculate total needed for all servings
-      const totalNeeded = servings * perPiece;
-      
-      // Generate result text
-      let resultText = `<strong>Total Za'atar mix needed:</strong> ${totalNeeded}g<br>`;
-      resultText += `<strong>Mix yield:</strong> ${Math.round(state.toppings.zaatar.totalWeight)}g<br>`;
-      
-      if (state.toppings.zaatar.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.zaatar.totalWeight;
-        resultText += `<strong>Batches needed:</strong> ${batches.toFixed(2)}x<br>`;
-        
-        if (state.showToppingPrices) {
-          const totalCost = state.toppings.zaatar.totalCost * batches;
-          const costPerPiece = totalCost / servings;
-          resultText += `<strong>Total cost:</strong> $${totalCost.toFixed(2)}<br>`;
-          resultText += `<strong>Cost per piece:</strong> $${costPerPiece.toFixed(2)}`;
-        }
+      // Update the total column in the total row
+      const totalRow = document.querySelector('#zaatar-ingredients-table tbody tr.total-row');
+      if (totalRow) {
+        const totalAmountCell = totalRow.querySelector('td:nth-child(3)');
+        if (totalAmountCell) totalAmountCell.textContent = `${Math.round(state.toppings.zaatar.totalWeight)}g`;
       }
       
-      // Update display
-      domElements.zaatarResult.innerHTML = resultText;
+      updatePriceDisplay(domElements.zaatarMixCost, state.toppings.zaatar.totalCost);
+      domElements.zaatarResult.innerHTML = `<strong>Total Za'atar mix needed:</strong> ${Math.round(totalNeeded)}g`;
       
-      // Update print view
       updatePrintView();
     } catch (error) {
-      console.error('Error in za\'atar calculation:', error);
+      console.error('Error in zaatar calculation:', error);
     }
   }
   
   // Cheese Topping Calculator
   function initCheeseCalculator() {
-    // Add event listeners to cheese inputs
     domElements.cheeseServings.addEventListener('input', debounce(calculateCheese));
-    domElements.cheesePerPiece.addEventListener('input', debounce(calculateCheese));
-    
-    // Add event listeners to cheese ingredients
     document.querySelectorAll('#cheese-ingredients-table input').forEach(input => {
       input.addEventListener('input', debounce(calculateCheese));
     });
-    
-    // Add event listeners to remove cheese buttons
     document.querySelectorAll('#cheese-ingredients-table .remove-item-button').forEach(button => {
       button.addEventListener('click', function() {
         const row = this.closest('tr');
@@ -694,165 +748,109 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       });
     });
-    
-    // Add custom cheese type button
     domElements.addCheeseIngredient.addEventListener('click', function() {
       domElements.cheeseIngredientForm.style.display = 'block';
       domElements.cheeseIngredientName.focus();
     });
-    
-    // Save custom cheese type
     domElements.saveCheeseIngredient.addEventListener('click', function() {
       const name = domElements.cheeseIngredientName.value.trim();
-      const percent = parseFloat(domElements.cheeseIngredientPercent.value) || 0;
+      const amount = parseFloat(domElements.cheeseIngredientAmount.value) || 0;
       const price = parseFloat(domElements.cheeseIngredientPrice.value) || 0;
-      
-      if (name && percent > 0) {
-        addCheeseIngredientRow(name, percent, price);
+      if (name && amount > 0) {
+        addCheeseIngredientRow(name, amount, price);
         resetCheeseIngredientForm();
         calculateCheese();
       }
     });
-    
-    // Cancel custom cheese type
     domElements.cancelCheeseIngredient.addEventListener('click', function() {
       resetCheeseIngredientForm();
     });
-    
-    // Initial calculation
     calculateCheese();
   }
-  
+
   function resetCheeseIngredientForm() {
     domElements.cheeseIngredientForm.style.display = 'none';
     domElements.cheeseIngredientName.value = '';
-    domElements.cheeseIngredientPercent.value = '';
+    domElements.cheeseIngredientAmount.value = '';
     domElements.cheeseIngredientPrice.value = '';
   }
-  
-  function addCheeseIngredientRow(name, percent, price) {
+
+  function addCheeseIngredientRow(name, amount, price) {
     const tbody = document.querySelector('#cheese-ingredients-table tbody');
     const totalRow = tbody.querySelector('.total-row');
-    
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
       <td>${name}</td>
-      <td><input type="number" class="cheese-ingredient-percent" value="${percent}" min="0" max="100" step="5"></td>
+      <td><input type="number" class="cheese-ingredient-amount" value="${amount}" min="0"></td>
+      <td class="cheese-total-amount">0g</td>
       <td class="price-column"><input type="number" class="price-input" value="${price}" min="0" step="0.1"></td>
       <td class="price-column price-display">$0.00</td>
       <td><button class="remove-item-button"><i class="fa fa-trash"></i></button></td>
     `;
-    
-    // Add event listeners to new inputs
     newRow.querySelectorAll('input').forEach(input => {
       input.addEventListener('input', debounce(calculateCheese));
     });
-    
-    // Add event listener to remove button
     newRow.querySelector('.remove-item-button').addEventListener('click', function() {
       tbody.removeChild(newRow);
       calculateCheese();
     });
-    
-    // Insert before total row
     tbody.insertBefore(newRow, totalRow);
   }
-  
+
   function calculateCheese() {
     try {
-      // Clear previous state
       state.toppings.cheese.cheeseTypes = [];
       state.toppings.cheese.totalCost = 0;
+      state.toppings.cheese.totalWeight = 0;
       
-      // Get input values
-      const servings = parseInt(domElements.cheeseServings.value) || 0;
-      const perPiece = parseInt(domElements.cheesePerPiece.value) || 0;
-      
-      // Store in state
-      state.toppings.cheese.servings = servings;
+      // Use fixed perPiece value since we removed the input field
+      const perPiece = 50; // Default: 50g per piece
       state.toppings.cheese.perPiece = perPiece;
       
-      // Get all cheese type rows
-      const cheeseRows = document.querySelectorAll('#cheese-ingredients-table tbody tr:not(.total-row)');
+      const servings = parseInt(domElements.cheeseServings.value) || 0;
+      state.toppings.cheese.servings = servings;
       
-      let totalPercent = 0;
+      const ingredientRows = document.querySelectorAll('#cheese-ingredients-table tbody tr:not(.total-row)');
       
-      // Process each cheese type row
-      cheeseRows.forEach(row => {
+      ingredientRows.forEach(row => {
         const nameCell = row.cells[0].textContent;
-        const percentInput = row.querySelector('.cheese-ingredient-percent');
+        const amountInput = row.querySelector('.cheese-ingredient-amount');
+        const totalAmountCell = row.querySelector('.cheese-total-amount');
         const priceInput = row.querySelector('.price-input');
         const priceDisplay = row.querySelector('.price-display');
         
-        const percent = parseFloat(percentInput.value) || 0;
+        const amount = parseFloat(amountInput.value) || 0;
+        const totalAmount = amount * servings;
+        
+        // Update total amount cell
+        if (totalAmountCell) totalAmountCell.textContent = totalAmount + 'g';
+        
         const pricePerKg = parseFloat(priceInput.value) || 0;
+        const cost = (totalAmount / 1000) * pricePerKg;
+        updatePriceDisplay(priceDisplay, cost);
         
-        totalPercent += percent;
+        state.toppings.cheese.totalWeight += totalAmount;
+        state.toppings.cheese.totalCost += cost;
         
-        // Store cheese type data
         state.toppings.cheese.cheeseTypes.push({
           name: nameCell,
-          percent: percent,
-          pricePerKg: pricePerKg
+          amount: amount,
+          totalAmount: totalAmount,
+          pricePerKg: pricePerKg,
+          cost: cost
         });
       });
       
-      // Update total percent display
-      domElements.cheesePercentTotal.textContent = `${Math.round(totalPercent)}%`;
-      
-      // Check if total is 100%
-      const validPercentage = Math.abs(totalPercent - 100) < 1;
-      domElements.cheeseProportionError.style.display = validPercentage ? 'none' : 'block';
-      
-      // Calculate total needed and cost
-      const totalNeeded = servings * perPiece;
-      let totalCost = 0;
-      
-      if (validPercentage) {
-        // Calculate cost for each cheese type
-        state.toppings.cheese.cheeseTypes.forEach(cheese => {
-          const amount = (cheese.percent / 100) * totalNeeded;
-          const cost = (amount / 1000) * cheese.pricePerKg;
-          
-          cheese.amount = amount;
-          cheese.cost = cost;
-          
-          totalCost += cost;
-        });
-        
-        // Update cost displays in the table
-        cheeseRows.forEach((row, index) => {
-          const priceDisplay = row.querySelector('.price-display');
-          const cheese = state.toppings.cheese.cheeseTypes[index];
-          priceDisplay.textContent = `$${cheese.cost.toFixed(2)}`;
-        });
-        
-        // Update total cost display
-        domElements.cheeseMixCost.textContent = `$${totalCost.toFixed(2)}`;
-        
-        // Store total cost in state
-        state.toppings.cheese.totalCost = totalCost;
+      // Update UI
+      const totalRow = document.querySelector('#cheese-ingredients-table tbody tr.total-row');
+      if (totalRow) {
+        const totalAmountCell = totalRow.querySelector('td:nth-child(3)');
+        if (totalAmountCell) totalAmountCell.textContent = `${Math.round(state.toppings.cheese.totalWeight)}g`;
       }
       
-      // Generate result text
-      let resultText = `<strong>Total cheese needed:</strong> ${totalNeeded}g<br>`;
+      updatePriceDisplay(domElements.cheeseMixCost, state.toppings.cheese.totalCost);
+      domElements.cheeseResult.innerHTML = `<strong>Total cheese mix needed:</strong> ${Math.round(state.toppings.cheese.totalWeight)}g`;
       
-      if (validPercentage) {
-        state.toppings.cheese.cheeseTypes.forEach(cheese => {
-          resultText += `<strong>${cheese.name}:</strong> ${Math.round(cheese.amount)}g<br>`;
-        });
-        
-        if (state.showToppingPrices) {
-          const costPerPiece = totalCost / servings;
-          resultText += `<strong>Total cost:</strong> $${totalCost.toFixed(2)}<br>`;
-          resultText += `<strong>Cost per piece:</strong> $${costPerPiece.toFixed(2)}`;
-        }
-      }
-      
-      // Update display
-      domElements.cheeseResult.innerHTML = resultText;
-      
-      // Update print view
       updatePrintView();
     } catch (error) {
       console.error('Error in cheese calculation:', error);
@@ -861,16 +859,10 @@ document.addEventListener("DOMContentLoaded", function() {
   
   // Meat Topping Calculator
   function initMeatCalculator() {
-    // Add event listeners to meat inputs
     domElements.meatServings.addEventListener('input', debounce(calculateMeat));
-    domElements.meatPerPiece.addEventListener('input', debounce(calculateMeat));
-    
-    // Add event listeners to meat ingredients
     document.querySelectorAll('#meat-ingredients-table input').forEach(input => {
       input.addEventListener('input', debounce(calculateMeat));
     });
-    
-    // Add event listeners to remove ingredient buttons
     document.querySelectorAll('#meat-ingredients-table .remove-item-button').forEach(button => {
       button.addEventListener('click', function() {
         const row = this.closest('tr');
@@ -880,160 +872,125 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       });
     });
-    
-    // Add custom ingredient button
     domElements.addMeatIngredient.addEventListener('click', function() {
       domElements.meatIngredientForm.style.display = 'block';
       domElements.meatIngredientName.focus();
     });
-    
-    // Save custom ingredient
     domElements.saveMeatIngredient.addEventListener('click', function() {
       const name = domElements.meatIngredientName.value.trim();
       const amount = parseFloat(domElements.meatIngredientAmount.value) || 0;
       const price = parseFloat(domElements.meatIngredientPrice.value) || 0;
-      
       if (name && amount > 0) {
         addMeatIngredientRow(name, amount, price);
         resetMeatIngredientForm();
         calculateMeat();
       }
     });
-    
-    // Cancel custom ingredient
     domElements.cancelMeatIngredient.addEventListener('click', function() {
       resetMeatIngredientForm();
     });
-    
-    // Initial calculation
     calculateMeat();
   }
-  
+
   function resetMeatIngredientForm() {
     domElements.meatIngredientForm.style.display = 'none';
     domElements.meatIngredientName.value = '';
     domElements.meatIngredientAmount.value = '';
     domElements.meatIngredientPrice.value = '';
   }
-  
+
   function addMeatIngredientRow(name, amount, price) {
     const tbody = document.querySelector('#meat-ingredients-table tbody');
     const totalRow = tbody.querySelector('.total-row');
-    
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
       <td>${name}</td>
       <td><input type="number" class="meat-ingredient-amount" value="${amount}" min="0"></td>
+      <td class="meat-total-amount">0g</td>
       <td class="price-column"><input type="number" class="price-input" value="${price}" min="0" step="0.1"></td>
       <td class="price-column price-display">$0.00</td>
       <td><button class="remove-item-button"><i class="fa fa-trash"></i></button></td>
     `;
-    
-    // Add event listeners to new inputs
     newRow.querySelectorAll('input').forEach(input => {
       input.addEventListener('input', debounce(calculateMeat));
     });
-    
-    // Add event listener to remove button
     newRow.querySelector('.remove-item-button').addEventListener('click', function() {
       tbody.removeChild(newRow);
       calculateMeat();
     });
-    
-    // Insert before total row
     tbody.insertBefore(newRow, totalRow);
   }
-  
+
   function calculateMeat() {
     try {
-      // Clear previous state
       state.toppings.meat.ingredients = [];
       state.toppings.meat.totalWeight = 0;
       state.toppings.meat.totalCost = 0;
       
-      // Get input values
-      const servings = parseInt(domElements.meatServings.value) || 0;
-      const perPiece = parseInt(domElements.meatPerPiece.value) || 0;
-      
-      // Store in state
-      state.toppings.meat.servings = servings;
+      // Use fixed perPiece value since we removed the input field
+      const perPiece = 50; // Default: 50g per piece
       state.toppings.meat.perPiece = perPiece;
       
-      // Get all ingredient rows
-      const ingredientRows = document.querySelectorAll('#meat-ingredients-table tbody tr:not(.total-row)');
+      const servings = parseInt(domElements.meatServings.value) || 0;
+      state.toppings.meat.servings = servings;
       
-      // Process each ingredient row
+      const totalNeeded = servings * perPiece;
+      
+      const ingredientRows = document.querySelectorAll('#meat-ingredients-table tbody tr:not(.total-row)');
       ingredientRows.forEach(row => {
         const nameCell = row.cells[0].textContent;
         const amountInput = row.querySelector('.meat-ingredient-amount');
+        const totalAmountCell = row.querySelector('.meat-total-amount');
         const priceInput = row.querySelector('.price-input');
         const priceDisplay = row.querySelector('.price-display');
         
         const amount = parseFloat(amountInput.value) || 0;
+        const totalAmount = amount * servings;
+        
+        // Update total amount cell
+        if (totalAmountCell) totalAmountCell.textContent = totalAmount + 'g';
+        
         const pricePerKg = parseFloat(priceInput.value) || 0;
-        const cost = (amount / 1000) * pricePerKg;
+        const cost = (totalAmount / 1000) * pricePerKg;
+        updatePriceDisplay(priceDisplay, cost);
         
-        // Update price display
-        priceDisplay.textContent = `$${cost.toFixed(2)}`;
-        
-        // Add to total weight and cost
-        state.toppings.meat.totalWeight += amount;
+        state.toppings.meat.totalWeight += totalAmount;
         state.toppings.meat.totalCost += cost;
         
-        // Store ingredient data
         state.toppings.meat.ingredients.push({
           name: nameCell,
           amount: amount,
+          totalAmount: totalAmount,
           pricePerKg: pricePerKg,
           cost: cost
         });
       });
       
-      // Update total weight and cost display
+      // Update UI
       domElements.meatMixWeight.textContent = `${Math.round(state.toppings.meat.totalWeight)}g`;
-      domElements.meatMixCost.textContent = `$${state.toppings.meat.totalCost.toFixed(2)}`;
       
-      // Calculate total needed for all servings
-      const totalNeeded = servings * perPiece;
-      
-      // Generate result text
-      let resultText = `<strong>Total meat mix needed:</strong> ${totalNeeded}g<br>`;
-      resultText += `<strong>Mix yield:</strong> ${Math.round(state.toppings.meat.totalWeight)}g<br>`;
-      
-      if (state.toppings.meat.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.meat.totalWeight;
-        resultText += `<strong>Batches needed:</strong> ${batches.toFixed(2)}x<br>`;
-        
-        if (state.showToppingPrices) {
-          const totalCost = state.toppings.meat.totalCost * batches;
-          const costPerPiece = totalCost / servings;
-          resultText += `<strong>Total cost:</strong> $${totalCost.toFixed(2)}<br>`;
-          resultText += `<strong>Cost per piece:</strong> $${costPerPiece.toFixed(2)}`;
-        }
+      // Update the total column in the total row
+      const totalRow = document.querySelector('#meat-ingredients-table tbody tr.total-row');
+      if (totalRow) {
+        const totalAmountCell = totalRow.querySelector('td:nth-child(3)');
+        if (totalAmountCell) totalAmountCell.textContent = `${Math.round(state.toppings.meat.totalWeight)}g`;
       }
       
-      // Update display
-      domElements.meatResult.innerHTML = resultText;
+      updatePriceDisplay(domElements.meatMixCost, state.toppings.meat.totalCost);
+      domElements.meatResult.innerHTML = `<strong>Total meat mix needed:</strong> ${Math.round(totalNeeded)}g`;
       
-      // Update print view
       updatePrintView();
     } catch (error) {
       console.error('Error in meat calculation:', error);
     }
   }
   
-  // Banana Chocolate Topping Calculator
+  // Banana Topping Calculator
   function initBananaCalculator() {
-    // Add event listeners to banana inputs
     domElements.bananaServings.addEventListener('input', debounce(calculateBanana));
-    domElements.bananaPerPiece.addEventListener('input', debounce(calculateBanana));
-    
-    // Add event listeners to banana ingredients
     document.querySelectorAll('#banana-ingredients-table input').forEach(input => {
       input.addEventListener('input', debounce(calculateBanana));
     });
-    
-    // Add event listeners to remove ingredient buttons
     document.querySelectorAll('#banana-ingredients-table .remove-item-button').forEach(button => {
       button.addEventListener('click', function() {
         const row = this.closest('tr');
@@ -1043,142 +1000,113 @@ document.addEventListener("DOMContentLoaded", function() {
         }
       });
     });
-    
-    // Add custom ingredient button
     domElements.addBananaIngredient.addEventListener('click', function() {
       domElements.bananaIngredientForm.style.display = 'block';
       domElements.bananaIngredientName.focus();
     });
-    
-    // Save custom ingredient
     domElements.saveBananaIngredient.addEventListener('click', function() {
       const name = domElements.bananaIngredientName.value.trim();
       const amount = parseFloat(domElements.bananaIngredientAmount.value) || 0;
       const price = parseFloat(domElements.bananaIngredientPrice.value) || 0;
-      
       if (name && amount > 0) {
         addBananaIngredientRow(name, amount, price);
         resetBananaIngredientForm();
         calculateBanana();
       }
     });
-    
-    // Cancel custom ingredient
     domElements.cancelBananaIngredient.addEventListener('click', function() {
       resetBananaIngredientForm();
     });
-    
-    // Initial calculation
     calculateBanana();
   }
-  
+
   function resetBananaIngredientForm() {
     domElements.bananaIngredientForm.style.display = 'none';
     domElements.bananaIngredientName.value = '';
     domElements.bananaIngredientAmount.value = '';
     domElements.bananaIngredientPrice.value = '';
   }
-  
+
   function addBananaIngredientRow(name, amount, price) {
     const tbody = document.querySelector('#banana-ingredients-table tbody');
     const totalRow = tbody.querySelector('.total-row');
-    
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
       <td>${name}</td>
       <td><input type="number" class="banana-ingredient-amount" value="${amount}" min="0"></td>
+      <td class="banana-total-amount">0g</td>
       <td class="price-column"><input type="number" class="price-input" value="${price}" min="0" step="0.1"></td>
       <td class="price-column price-display">$0.00</td>
       <td><button class="remove-item-button"><i class="fa fa-trash"></i></button></td>
     `;
-    
-    // Add event listeners to new inputs
     newRow.querySelectorAll('input').forEach(input => {
       input.addEventListener('input', debounce(calculateBanana));
     });
-    
-    // Add event listener to remove button
     newRow.querySelector('.remove-item-button').addEventListener('click', function() {
       tbody.removeChild(newRow);
       calculateBanana();
     });
-    
-    // Insert before total row
     tbody.insertBefore(newRow, totalRow);
   }
-  
+
   function calculateBanana() {
     try {
-      // Clear previous state
       state.toppings.banana.ingredients = [];
       state.toppings.banana.totalWeight = 0;
       state.toppings.banana.totalCost = 0;
       
-      // Get input values
-      const servings = parseInt(domElements.bananaServings.value) || 0;
-      const perPiece = parseInt(domElements.bananaPerPiece.value) || 0;
-      
-      // Store in state
-      state.toppings.banana.servings = servings;
+      // Use fixed perPiece value since we removed the input field
+      const perPiece = 50; // Default: 50g per piece
       state.toppings.banana.perPiece = perPiece;
       
-      // Get all ingredient rows
-      const ingredientRows = document.querySelectorAll('#banana-ingredients-table tbody tr:not(.total-row)');
+      const servings = parseInt(domElements.bananaServings.value) || 0;
+      state.toppings.banana.servings = servings;
       
-      // Process each ingredient row
+      const totalNeeded = servings * perPiece;
+      
+      const ingredientRows = document.querySelectorAll('#banana-ingredients-table tbody tr:not(.total-row)');
       ingredientRows.forEach(row => {
         const nameCell = row.cells[0].textContent;
         const amountInput = row.querySelector('.banana-ingredient-amount');
+        const totalAmountCell = row.querySelector('.banana-total-amount');
         const priceInput = row.querySelector('.price-input');
         const priceDisplay = row.querySelector('.price-display');
         
         const amount = parseFloat(amountInput.value) || 0;
+        const totalAmount = amount * servings;
+        
+        // Update total amount cell
+        if (totalAmountCell) totalAmountCell.textContent = totalAmount + 'g';
+        
         const pricePerKg = parseFloat(priceInput.value) || 0;
-        const cost = (amount / 1000) * pricePerKg;
+        const cost = (totalAmount / 1000) * pricePerKg;
+        updatePriceDisplay(priceDisplay, cost);
         
-        // Update price display
-        priceDisplay.textContent = `$${cost.toFixed(2)}`;
-        
-        // Add to total weight and cost
-        state.toppings.banana.totalWeight += amount;
+        state.toppings.banana.totalWeight += totalAmount;
         state.toppings.banana.totalCost += cost;
         
-        // Store ingredient data
         state.toppings.banana.ingredients.push({
           name: nameCell,
           amount: amount,
+          totalAmount: totalAmount,
           pricePerKg: pricePerKg,
           cost: cost
         });
       });
       
-      // Update total weight and cost display
+      // Update UI
       domElements.bananaMixWeight.textContent = `${Math.round(state.toppings.banana.totalWeight)}g`;
-      domElements.bananaMixCost.textContent = `$${state.toppings.banana.totalCost.toFixed(2)}`;
       
-      // Calculate total needed for all servings
-      const totalNeeded = servings * perPiece;
-      
-      // Generate result text
-      let resultText = `<strong>Total chocolate-banana mix needed:</strong> ${totalNeeded}g<br>`;
-      resultText += `<strong>Mix yield:</strong> ${Math.round(state.toppings.banana.totalWeight)}g<br>`;
-      
-      if (state.toppings.banana.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.banana.totalWeight;
-        resultText += `<strong>Batches needed:</strong> ${batches.toFixed(2)}x<br>`;
-        
-        if (state.showToppingPrices) {
-          const totalCost = state.toppings.banana.totalCost * batches;
-          const costPerPiece = totalCost / servings;
-          resultText += `<strong>Total cost:</strong> $${totalCost.toFixed(2)}<br>`;
-          resultText += `<strong>Cost per piece:</strong> $${costPerPiece.toFixed(2)}`;
-        }
+      // Update the total column in the total row
+      const totalRow = document.querySelector('#banana-ingredients-table tbody tr.total-row');
+      if (totalRow) {
+        const totalAmountCell = totalRow.querySelector('td:nth-child(3)');
+        if (totalAmountCell) totalAmountCell.textContent = `${Math.round(state.toppings.banana.totalWeight)}g`;
       }
       
-      // Update display
-      domElements.bananaResult.innerHTML = resultText;
+      updatePriceDisplay(domElements.bananaMixCost, state.toppings.banana.totalCost);
+      domElements.bananaResult.innerHTML = `<strong>Total chocolate-banana mix needed:</strong> ${Math.round(totalNeeded)}g`;
       
-      // Update print view
       updatePrintView();
     } catch (error) {
       console.error('Error in banana calculation:', error);
@@ -1192,357 +1120,154 @@ document.addEventListener("DOMContentLoaded", function() {
     calculateBanana();
   }
   
-  // Summary Tab Functions
-  function updateSummary() {
+  // Add this debounced version of updateSummary
+  const debouncedUpdateSummary = debounce(function() {
     // Only update if the summary tab is active
     if (state.activeTab !== 'summary') return;
     
     try {
-      // Production Overview
-      updateProductionSummary();
-      
-      // Dough Ingredients Summary
-      updateDoughSummary();
-      
-      // Topping Ingredients Summary
-      updateToppingsSummary();
-      
-      // Total Project Cost
-      updateCostSummary();
-      
-      // Update print view
-      updatePrintView();
+        // Use requestAnimationFrame for smoother updates
+        requestAnimationFrame(() => {
+            // Update sections one by one
+            updateProductionSummary();
+            requestAnimationFrame(() => {
+                updateDoughSummary();
+                requestAnimationFrame(() => {
+                    updateToppingsSummary();
+                    requestAnimationFrame(() => {
+                        updateCostSummary();
+                        // Update print view after all calculations are done
+                        requestAnimationFrame(() => {
+                            updatePrintView();
+                        });
+                    });
+                });
+            });
+        });
     } catch (error) {
-      console.error('Error in summary calculation:', error);
+        console.error('Error in summary calculation:', error);
     }
+}, 100);
+
+  // Keep the original updateSummary as a simple wrapper for the debounced version
+  function updateSummary() {
+    debouncedUpdateSummary();
   }
   
+  // Summary Tab Functions
   function updateProductionSummary() {
     const tbody = domElements.summaryProduction;
     tbody.innerHTML = '';
     
-    // Add dough balls
+    // Get current currency
+    const currency = domElements.globalCurrencySelector.value || 'GBP';
+    
+    // Calculate dough cost
+    const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
+    const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
+    const scaledDoughCost = state.doughRecipe.totalCost * scalingFactor;
+    const doughCostPerBall = state.doughRecipe.batch.numBalls > 0 ? 
+        scaledDoughCost / state.doughRecipe.batch.numBalls : 0;
+    
+    // Calculate all toppings cost
+    let totalToppingsCost = 0;
+    
+    // Add standard toppings
+    totalToppingsCost += state.toppings.zaatar.totalCost || 0;
+    totalToppingsCost += state.toppings.cheese.totalCost || 0;
+    totalToppingsCost += state.toppings.meat.totalCost || 0;
+    totalToppingsCost += state.toppings.banana.totalCost || 0;
+    
+    // Add custom toppings
+    Object.keys(state.customToppings || {}).forEach(id => {
+      totalToppingsCost += state.customToppings[id].totalCost || 0;
+    });
+    
+    // Calculate total project cost
+    const totalProjectCost = scaledDoughCost + totalToppingsCost;
+    
     const doughRow = document.createElement('tr');
     doughRow.innerHTML = `
-      <td>Manakish Dough Balls</td>
-      <td>${state.doughRecipe.batch.numBalls}</td>
-      <td class="price-column">$${(state.doughRecipe.totalCost / state.doughRecipe.batch.numBalls).toFixed(2)}</td>
-      <td class="price-column">$${state.doughRecipe.totalCost.toFixed(2)}</td>
+      <td>Dough</td>
+      <td>${state.doughRecipe.batch.numBalls} pieces</td>
+      <td class="price-column">${formatPrice(doughCostPerBall, currency)}</td>
+      <td class="price-column">${formatPrice(scaledDoughCost, currency)}</td>
     `;
     tbody.appendChild(doughRow);
     
-    // Add Za'atar Manakish
+    // Add toppings rows
     if (state.toppings.zaatar.servings > 0) {
-      const totalNeeded = state.toppings.zaatar.servings * state.toppings.zaatar.perPiece;
-      const batches = totalNeeded / state.toppings.zaatar.totalWeight;
-      const totalCost = state.toppings.zaatar.totalCost * batches;
-      const costPerPiece = totalCost / state.toppings.zaatar.servings;
-      
+      const zaatarCostPerServing = state.toppings.zaatar.totalCost / state.toppings.zaatar.servings;
       const zaatarRow = document.createElement('tr');
       zaatarRow.innerHTML = `
-        <td>Za'atar Manakish</td>
-        <td>${state.toppings.zaatar.servings}</td>
-        <td class="price-column">$${costPerPiece.toFixed(2)}</td>
-        <td class="price-column">$${totalCost.toFixed(2)}</td>
+        <td>Za'atar Topping</td>
+        <td>${state.toppings.zaatar.servings} pieces</td>
+        <td class="price-column">${formatPrice(zaatarCostPerServing, currency)}</td>
+        <td class="price-column">${formatPrice(state.toppings.zaatar.totalCost, currency)}</td>
       `;
       tbody.appendChild(zaatarRow);
     }
     
-    // Add Cheese Manakish
     if (state.toppings.cheese.servings > 0) {
-      const costPerPiece = state.toppings.cheese.totalCost / state.toppings.cheese.servings;
-      
+      const cheeseCostPerServing = state.toppings.cheese.totalCost / state.toppings.cheese.servings;
       const cheeseRow = document.createElement('tr');
       cheeseRow.innerHTML = `
-        <td>Cheese Manakish</td>
-        <td>${state.toppings.cheese.servings}</td>
-        <td class="price-column">$${costPerPiece.toFixed(2)}</td>
-        <td class="price-column">$${state.toppings.cheese.totalCost.toFixed(2)}</td>
+        <td>Cheese Topping</td>
+        <td>${state.toppings.cheese.servings} pieces</td>
+        <td class="price-column">${formatPrice(cheeseCostPerServing, currency)}</td>
+        <td class="price-column">${formatPrice(state.toppings.cheese.totalCost, currency)}</td>
       `;
       tbody.appendChild(cheeseRow);
     }
     
-    // Add Meat Manakish
     if (state.toppings.meat.servings > 0) {
-      const totalNeeded = state.toppings.meat.servings * state.toppings.meat.perPiece;
-      const batches = totalNeeded / state.toppings.meat.totalWeight;
-      const totalCost = state.toppings.meat.totalCost * batches;
-      const costPerPiece = totalCost / state.toppings.meat.servings;
-      
+      const meatCostPerServing = state.toppings.meat.totalCost / state.toppings.meat.servings;
       const meatRow = document.createElement('tr');
       meatRow.innerHTML = `
-        <td>Meat Manakish</td>
-        <td>${state.toppings.meat.servings}</td>
-        <td class="price-column">$${costPerPiece.toFixed(2)}</td>
-        <td class="price-column">$${totalCost.toFixed(2)}</td>
+        <td>Meat Topping</td>
+        <td>${state.toppings.meat.servings} pieces</td>
+        <td class="price-column">${formatPrice(meatCostPerServing, currency)}</td>
+        <td class="price-column">${formatPrice(state.toppings.meat.totalCost, currency)}</td>
       `;
       tbody.appendChild(meatRow);
     }
     
-    // Add Banana Chocolate Manakish
     if (state.toppings.banana.servings > 0) {
-      const totalNeeded = state.toppings.banana.servings * state.toppings.banana.perPiece;
-      const batches = totalNeeded / state.toppings.banana.totalWeight;
-      const totalCost = state.toppings.banana.totalCost * batches;
-      const costPerPiece = totalCost / state.toppings.banana.servings;
-      
+      const bananaCostPerServing = state.toppings.banana.totalCost / state.toppings.banana.servings;
       const bananaRow = document.createElement('tr');
       bananaRow.innerHTML = `
-        <td>Chocolate Banana Manakish</td>
-        <td>${state.toppings.banana.servings}</td>
-        <td class="price-column">$${costPerPiece.toFixed(2)}</td>
-        <td class="price-column">$${totalCost.toFixed(2)}</td>
+        <td>Chocolate-Banana Topping</td>
+        <td>${state.toppings.banana.servings} pieces</td>
+        <td class="price-column">${formatPrice(bananaCostPerServing, currency)}</td>
+        <td class="price-column">${formatPrice(state.toppings.banana.totalCost, currency)}</td>
       `;
       tbody.appendChild(bananaRow);
     }
     
-    // Add total row
-    const totalRow = document.createElement('tr');
-    totalRow.className = 'total-row';
-    
-    const totalQuantity = state.doughRecipe.batch.numBalls;
-    
-    const totalCost = state.doughRecipe.totalCost + 
-                      (state.toppings.zaatar.servings > 0 ? state.toppings.zaatar.totalCost * (state.toppings.zaatar.servings * state.toppings.zaatar.perPiece / state.toppings.zaatar.totalWeight) : 0) +
-                      state.toppings.cheese.totalCost +
-                      (state.toppings.meat.servings > 0 ? state.toppings.meat.totalCost * (state.toppings.meat.servings * state.toppings.meat.perPiece / state.toppings.meat.totalWeight) : 0) +
-                      (state.toppings.banana.servings > 0 ? state.toppings.banana.totalCost * (state.toppings.banana.servings * state.toppings.banana.perPiece / state.toppings.banana.totalWeight) : 0);
-    
-    totalRow.innerHTML = `
-      <td>Total</td>
-      <td>${totalQuantity}</td>
-      <td class="price-column"></td>
-      <td class="price-column">$${totalCost.toFixed(2)}</td>
-    `;
-    tbody.appendChild(totalRow);
-  }
-  
-  function updateDoughSummary() {
-    const tbody = domElements.summaryDough;
-    tbody.innerHTML = '';
-    
-    // Calculate scaling factor for batch
-    const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
-    const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
-    
-    // Add each dough ingredient
-    state.doughRecipe.ingredients.forEach(ingredient => {
-      const scaledWeight = Math.round(ingredient.weight * scalingFactor);
-      const scaledCost = ingredient.cost * scalingFactor;
-      
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${ingredient.name}</td>
-        <td>${scaledWeight}g</td>
-        <td class="price-column">$${scaledCost.toFixed(2)}</td>
-      `;
-      tbody.appendChild(row);
+    // Add custom toppings
+    Object.keys(state.customToppings || {}).forEach(id => {
+      const topping = state.customToppings[id];
+      if (topping.servings > 0) {
+        const costPerServing = topping.totalCost / topping.servings;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${topping.name} Topping</td>
+          <td>${topping.servings} pieces</td>
+          <td class="price-column">${formatPrice(costPerServing, currency)}</td>
+          <td class="price-column">${formatPrice(topping.totalCost, currency)}</td>
+        `;
+        tbody.appendChild(row);
+      }
     });
-    
-    // Add total row
-    const totalRow = document.createElement('tr');
-    totalRow.className = 'total-row';
-    
-    const scaledTotalCost = state.doughRecipe.totalCost * scalingFactor;
-    
-    totalRow.innerHTML = `
-      <td>Total Dough</td>
-      <td>${Math.round(totalBatchWeight)}g</td>
-      <td class="price-column">$${scaledTotalCost.toFixed(2)}</td>
-    `;
-    tbody.appendChild(totalRow);
-  }
-  
-  function updateToppingsSummary() {
-    const tbody = domElements.summaryToppings;
-    tbody.innerHTML = '';
-    
-    // Create category row for Za'atar
-    if (state.toppings.zaatar.servings > 0) {
-      const categoryRow = document.createElement('tr');
-      categoryRow.className = 'category-row';
-      categoryRow.innerHTML = `
-        <td colspan="3">Za'atar Topping (${state.toppings.zaatar.servings} servings)</td>
-      `;
-      tbody.appendChild(categoryRow);
-      
-      // Calculate scaling factor for za'atar
-      const totalNeeded = state.toppings.zaatar.servings * state.toppings.zaatar.perPiece;
-      const batches = state.toppings.zaatar.totalWeight > 0 ? totalNeeded / state.toppings.zaatar.totalWeight : 0;
-      
-      // Add za'atar ingredients
-      state.toppings.zaatar.ingredients.forEach(ingredient => {
-        const scaledAmount = Math.round(ingredient.amount * batches);
-        const scaledCost = ingredient.cost * batches;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${ingredient.name}</td>
-          <td>${scaledAmount}g</td>
-          <td class="price-column">$${scaledCost.toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-    
-    // Create category row for Cheese
-    if (state.toppings.cheese.servings > 0) {
-      const categoryRow = document.createElement('tr');
-      categoryRow.className = 'category-row';
-      categoryRow.innerHTML = `
-        <td colspan="3">Cheese Topping (${state.toppings.cheese.servings} servings)</td>
-      `;
-      tbody.appendChild(categoryRow);
-      
-      // Calculate total needed
-      const totalNeeded = state.toppings.cheese.servings * state.toppings.cheese.perPiece;
-      
-      // Add cheese types
-      state.toppings.cheese.cheeseTypes.forEach(cheese => {
-        const amount = (cheese.percent / 100) * totalNeeded;
-        const cost = (amount / 1000) * cheese.pricePerKg;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${cheese.name}</td>
-          <td>${Math.round(amount)}g</td>
-          <td class="price-column">$${cost.toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-    
-    // Create category row for Meat
-    if (state.toppings.meat.servings > 0) {
-      const categoryRow = document.createElement('tr');
-      categoryRow.className = 'category-row';
-      categoryRow.innerHTML = `
-        <td colspan="3">Meat Topping (${state.toppings.meat.servings} servings)</td>
-      `;
-      tbody.appendChild(categoryRow);
-      
-      // Calculate scaling factor for meat
-      const totalNeeded = state.toppings.meat.servings * state.toppings.meat.perPiece;
-      const batches = state.toppings.meat.totalWeight > 0 ? totalNeeded / state.toppings.meat.totalWeight : 0;
-      
-      // Add meat ingredients
-      state.toppings.meat.ingredients.forEach(ingredient => {
-        const scaledAmount = Math.round(ingredient.amount * batches);
-        const scaledCost = ingredient.cost * batches;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${ingredient.name}</td>
-          <td>${scaledAmount}g</td>
-          <td class="price-column">$${scaledCost.toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-    
-    // Create category row for Banana
-    if (state.toppings.banana.servings > 0) {
-      const categoryRow = document.createElement('tr');
-      categoryRow.className = 'category-row';
-      categoryRow.innerHTML = `
-        <td colspan="3">Chocolate Banana Topping (${state.toppings.banana.servings} servings)</td>
-      `;
-      tbody.appendChild(categoryRow);
-      
-      // Calculate scaling factor for banana
-      const totalNeeded = state.toppings.banana.servings * state.toppings.banana.perPiece;
-      const batches = state.toppings.banana.totalWeight > 0 ? totalNeeded / state.toppings.banana.totalWeight : 0;
-      
-      // Add banana ingredients
-      state.toppings.banana.ingredients.forEach(ingredient => {
-        const scaledAmount = Math.round(ingredient.amount * batches);
-        const scaledCost = ingredient.cost * batches;
-        
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${ingredient.name}</td>
-          <td>${scaledAmount}g</td>
-          <td class="price-column">$${scaledCost.toFixed(2)}</td>
-        `;
-        tbody.appendChild(row);
-      });
-    }
-    
-    // Add total row
-    const totalRow = document.createElement('tr');
-    totalRow.className = 'total-row';
-    
-    // Calculate total toppings cost
-    const totalZaatarCost = state.toppings.zaatar.servings > 0 ? 
-                         state.toppings.zaatar.totalCost * (state.toppings.zaatar.servings * state.toppings.zaatar.perPiece / state.toppings.zaatar.totalWeight) : 0;
-    
-    const totalCheeseCost = state.toppings.cheese.totalCost;
-    
-    const totalMeatCost = state.toppings.meat.servings > 0 ? 
-                       state.toppings.meat.totalCost * (state.toppings.meat.servings * state.toppings.meat.perPiece / state.toppings.meat.totalWeight) : 0;
-    
-    const totalBananaCost = state.toppings.banana.servings > 0 ? 
-                         state.toppings.banana.totalCost * (state.toppings.banana.servings * state.toppings.banana.perPiece / state.toppings.banana.totalWeight) : 0;
-    
-    const totalToppingsCost = totalZaatarCost + totalCheeseCost + totalMeatCost + totalBananaCost;
-    
-    totalRow.innerHTML = `
-      <td>Total Toppings</td>
-      <td></td>
-      <td class="price-column">$${totalToppingsCost.toFixed(2)}</td>
-    `;
-    tbody.appendChild(totalRow);
-  }
-  
-  function updateCostSummary() {
-    const tbody = domElements.summaryCosts;
-    tbody.innerHTML = '';
-    
-    // Calculate total costs
-    const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
-    const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
-    const doughCost = state.doughRecipe.totalCost * scalingFactor;
-    
-    const totalZaatarCost = state.toppings.zaatar.servings > 0 ? 
-                         state.toppings.zaatar.totalCost * (state.toppings.zaatar.servings * state.toppings.zaatar.perPiece / state.toppings.zaatar.totalWeight) : 0;
-    
-    const totalCheeseCost = state.toppings.cheese.totalCost;
-    
-    const totalMeatCost = state.toppings.meat.servings > 0 ? 
-                       state.toppings.meat.totalCost * (state.toppings.meat.servings * state.toppings.meat.perPiece / state.toppings.meat.totalWeight) : 0;
-    
-    const totalBananaCost = state.toppings.banana.servings > 0 ? 
-                         state.toppings.banana.totalCost * (state.toppings.banana.servings * state.toppings.banana.perPiece / state.toppings.banana.totalWeight) : 0;
-    
-    const totalToppingsCost = totalZaatarCost + totalCheeseCost + totalMeatCost + totalBananaCost;
-    
-    const totalProjectCost = doughCost + totalToppingsCost;
-    
-    // Add dough cost row
-    const doughRow = document.createElement('tr');
-    doughRow.innerHTML = `
-      <td>Dough</td>
-      <td class="price-column">$${doughCost.toFixed(2)}</td>
-      <td class="price-column">${totalProjectCost > 0 ? ((doughCost / totalProjectCost) * 100).toFixed(1) : 0}%</td>
-    `;
-    tbody.appendChild(doughRow);
-    
-    // Add toppings cost row
-    const toppingsRow = document.createElement('tr');
-    toppingsRow.innerHTML = `
-      <td>Toppings</td>
-      <td class="price-column">$${totalToppingsCost.toFixed(2)}</td>
-      <td class="price-column">${totalProjectCost > 0 ? ((totalToppingsCost / totalProjectCost) * 100).toFixed(1) : 0}%</td>
-    `;
-    tbody.appendChild(toppingsRow);
     
     // Add total row
     const totalRow = document.createElement('tr');
     totalRow.className = 'total-row';
     totalRow.innerHTML = `
       <td>Total Project Cost</td>
-      <td class="price-column">$${totalProjectCost.toFixed(2)}</td>
-      <td class="price-column">100%</td>
+      <td></td>
+      <td></td>
+      <td class="price-column">${formatPrice(totalProjectCost, currency)}</td>
     `;
     tbody.appendChild(totalRow);
   }
@@ -1799,7 +1524,7 @@ document.addEventListener("DOMContentLoaded", function() {
           
           // Add imported cheese types
           data.toppings.cheese.cheeseTypes.forEach(cheese => {
-            addCheeseIngredientRow(cheese.name, cheese.percent, cheese.price);
+            addCheeseIngredientRow(cheese.name, cheese.amount, cheese.price);
           });
           
           // Recalculate cheese
@@ -1955,420 +1680,61 @@ document.addEventListener("DOMContentLoaded", function() {
   }
   
   function updatePrintView() {
-    // Set current date
-    const currentDate = new Date().toLocaleDateString();
-    if (domElements.printDate) domElements.printDate.textContent = `Date: ${currentDate}`;
-    if (domElements.printFooterDate) domElements.printFooterDate.textContent = currentDate;
-    
-    // Update dough recipe table for printing
-    if (domElements.printRecipeTable) {
-      let doughHtml = `
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Weight (g)</th>
-            <th>Baker's %</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
+    try {
+      const currency = domElements.currencySelector.value;
       
-      // Calculate baker's percentages
-      const flourWeight = state.doughRecipe.ingredients.find(i => i.name.includes('Flour'))?.weight || 1;
-      
-      // Add ingredients
-      state.doughRecipe.ingredients.forEach(ingredient => {
-        const percentage = (ingredient.name.includes('Flour')) ? 100 : ((ingredient.weight / flourWeight) * 100).toFixed(1);
-        doughHtml += `
-          <tr>
-            <td>${ingredient.name}</td>
-            <td>${Math.round(ingredient.weight)}</td>
-            <td>${percentage}%</td>
-          </tr>
-        `;
-      });
-      
-      // Add total row
-      doughHtml += `
-        <tr class="total-row">
-          <td>Total Dough Weight</td>
-          <td>${Math.round(state.doughRecipe.totalWeight)}</td>
-          <td></td>
-        </tr>
-        </tbody>
-      `;
-      
-      domElements.printRecipeTable.innerHTML = doughHtml;
-    }
-    
-    // Update dough recipe details
-    if (domElements.printRecipeDetails) {
-      const numBalls = state.doughRecipe.batch.numBalls;
-      const ballWeight = state.doughRecipe.batch.ballWeight;
-      let detailsHtml = `<p>Makes ${numBalls} dough balls of ${ballWeight}g each.</p>`;
-      
-      // Add scaling info if needed
-      const totalBatchWeight = numBalls * ballWeight;
-      if (totalBatchWeight !== state.doughRecipe.totalWeight) {
-        const scalingFactor = totalBatchWeight / state.doughRecipe.totalWeight;
-        detailsHtml += `<p>Recipe scaled by factor of ${scalingFactor.toFixed(2)}.</p>`;
-      }
-      
-      domElements.printRecipeDetails.innerHTML = detailsHtml;
-    }
-    
-    // Update Za'atar table for printing
-    if (domElements.printZaatarTable && state.toppings.zaatar.servings > 0) {
-      let zaatarHtml = `
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Amount (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
-      
-      // Add ingredients
-      state.toppings.zaatar.ingredients.forEach(ingredient => {
-        zaatarHtml += `
-          <tr>
-            <td>${ingredient.name}</td>
-            <td>${Math.round(ingredient.amount)}</td>
-          </tr>
-        `;
-      });
-      
-      // Add total row
-      zaatarHtml += `
-        <tr class="total-row">
-          <td>Total Mix</td>
-          <td>${Math.round(state.toppings.zaatar.totalWeight)}</td>
-        </tr>
-        </tbody>
-      `;
-      
-      domElements.printZaatarTable.innerHTML = zaatarHtml;
-    }
-    
-    // Update Za'atar details
-    if (domElements.printZaatarDetails && state.toppings.zaatar.servings > 0) {
-      const servings = state.toppings.zaatar.servings;
-      const perPiece = state.toppings.zaatar.perPiece;
-      const totalNeeded = servings * perPiece;
-      
-      let detailsHtml = `<p>Makes enough for ${servings} manakish, ${perPiece}g each.</p>`;
-      detailsHtml += `<p>Total Za'atar mix needed: ${totalNeeded}g</p>`;
-      
-      if (state.toppings.zaatar.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.zaatar.totalWeight;
-        detailsHtml += `<p>Recipe should be made ${batches.toFixed(2)}x for the required amount.</p>`;
-      }
-      
-      domElements.printZaatarDetails.innerHTML = detailsHtml;
-    }
-    
-    // Update Cheese table for printing
-    if (domElements.printCheeseTable && state.toppings.cheese.servings > 0) {
-      let cheeseHtml = `
-        <thead>
-          <tr>
-            <th>Cheese Type</th>
-            <th>Proportion (%)</th>
-            <th>Amount (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
-      
-      const totalNeeded = state.toppings.cheese.servings * state.toppings.cheese.perPiece;
-      
-      // Add cheese types
-      state.toppings.cheese.cheeseTypes.forEach(cheese => {
-        const amount = (cheese.percent / 100) * totalNeeded;
-        cheeseHtml += `
-          <tr>
-            <td>${cheese.name}</td>
-            <td>${cheese.percent}</td>
-            <td>${Math.round(amount)}</td>
-          </tr>
-        `;
-      });
-      
-      // Add total row
-      const totalPercent = state.toppings.cheese.cheeseTypes.reduce((sum, cheese) => sum + cheese.percent, 0);
-      cheeseHtml += `
-        <tr class="total-row">
-          <td>Total</td>
-          <td>${Math.round(totalPercent)}%</td>
-          <td>${totalNeeded}</td>
-        </tr>
-        </tbody>
-      `;
-      
-      domElements.printCheeseTable.innerHTML = cheeseHtml;
-    }
-    
-    // Update Cheese details
-    if (domElements.printCheeseDetails && state.toppings.cheese.servings > 0) {
-      const servings = state.toppings.cheese.servings;
-      const perPiece = state.toppings.cheese.perPiece;
-      const totalNeeded = servings * perPiece;
-      
-      let detailsHtml = `<p>Makes enough for ${servings} manakish, ${perPiece}g each.</p>`;
-      detailsHtml += `<p>Total cheese needed: ${totalNeeded}g</p>`;
-      
-      domElements.printCheeseDetails.innerHTML = detailsHtml;
-    }
-    
-    // Update Meat table for printing
-    if (domElements.printMeatTable && state.toppings.meat.servings > 0) {
-      let meatHtml = `
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Amount (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
-      
-      // Add ingredients
-      state.toppings.meat.ingredients.forEach(ingredient => {
-        meatHtml += `
-          <tr>
-            <td>${ingredient.name}</td>
-            <td>${Math.round(ingredient.amount)}</td>
-          </tr>
-        `;
-      });
-      
-      // Add total row
-      meatHtml += `
-        <tr class="total-row">
-          <td>Total Mix</td>
-          <td>${Math.round(state.toppings.meat.totalWeight)}</td>
-        </tr>
-        </tbody>
-      `;
-      
-      domElements.printMeatTable.innerHTML = meatHtml;
-    }
-    
-    // Update Meat details
-    if (domElements.printMeatDetails && state.toppings.meat.servings > 0) {
-      const servings = state.toppings.meat.servings;
-      const perPiece = state.toppings.meat.perPiece;
-      const totalNeeded = servings * perPiece;
-      
-      let detailsHtml = `<p>Makes enough for ${servings} manakish, ${perPiece}g each.</p>`;
-      detailsHtml += `<p>Total meat mix needed: ${totalNeeded}g</p>`;
-      
-      if (state.toppings.meat.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.meat.totalWeight;
-        detailsHtml += `<p>Recipe should be made ${batches.toFixed(2)}x for the required amount.</p>`;
-      }
-      
-      domElements.printMeatDetails.innerHTML = detailsHtml;
-    }
-    
-    // Update Banana table for printing
-    if (domElements.printBananaTable && state.toppings.banana.servings > 0) {
-      let bananaHtml = `
-        <thead>
-          <tr>
-            <th>Ingredient</th>
-            <th>Amount (g)</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
-      
-      // Add ingredients
-      state.toppings.banana.ingredients.forEach(ingredient => {
-        bananaHtml += `
-          <tr>
-            <td>${ingredient.name}</td>
-            <td>${Math.round(ingredient.amount)}</td>
-          </tr>
-        `;
-      });
-      
-      // Add total row
-      bananaHtml += `
-        <tr class="total-row">
-          <td>Total Mix</td>
-          <td>${Math.round(state.toppings.banana.totalWeight)}</td>
-        </tr>
-        </tbody>
-      `;
-      
-      domElements.printBananaTable.innerHTML = bananaHtml;
-    }
-    
-    // Update Banana details
-    if (domElements.printBananaDetails && state.toppings.banana.servings > 0) {
-      const servings = state.toppings.banana.servings;
-      const perPiece = state.toppings.banana.perPiece;
-      const totalNeeded = servings * perPiece;
-      
-      let detailsHtml = `<p>Makes enough for ${servings} manakish, ${perPiece}g each.</p>`;
-      detailsHtml += `<p>Total chocolate-banana mix needed: ${totalNeeded}g</p>`;
-      
-      if (state.toppings.banana.totalWeight > 0) {
-        const batches = totalNeeded / state.toppings.banana.totalWeight;
-        detailsHtml += `<p>Recipe should be made ${batches.toFixed(2)}x for the required amount.</p>`;
-      }
-      
-      domElements.printBananaDetails.innerHTML = detailsHtml;
-    }
-    
-    // Update BOQ table for printing
-    if (domElements.printBoqTable) {
-      updateSummary(); // Make sure summary is up to date
-      
-      let boqHtml = `
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Item</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-          </tr>
-        </thead>
-        <tbody>
-      `;
-      
-      // Add dough section
-      boqHtml += `
-        <tr class="category-row">
-          <td colspan="4">Dough</td>
-        </tr>
-      `;
-      
-      // Add dough ingredients
-      const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
-      const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
+      // Update dough ingredients
+      const doughTable = domElements.printDoughTable;
+      doughTable.innerHTML = '';
       
       state.doughRecipe.ingredients.forEach(ingredient => {
-        const scaledWeight = Math.round(ingredient.weight * scalingFactor);
-        boqHtml += `
-          <tr>
-            <td></td>
-            <td>${ingredient.name}</td>
-            <td>${scaledWeight}</td>
-            <td>g</td>
-          </tr>
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${ingredient.name}</td>
+          <td>${ingredient.weight}g</td>
+          <td>${formatPrice(ingredient.pricePerKg, currency)}/kg</td>
+          <td>${formatPrice(ingredient.cost, currency)}</td>
         `;
+        doughTable.appendChild(row);
       });
       
-      // Add Za'atar section
-      if (state.toppings.zaatar.servings > 0) {
-        boqHtml += `
-          <tr class="category-row">
-            <td colspan="4">Za'atar Topping</td>
-          </tr>
+      // Add total row
+      const totalRow = document.createElement('tr');
+      totalRow.className = 'total-row';
+      totalRow.innerHTML = `
+        <td>Total</td>
+        <td>${Math.round(state.doughRecipe.totalWeight)}g</td>
+        <td></td>
+        <td>${formatPrice(state.doughRecipe.totalCost, currency)}</td>
+      `;
+      doughTable.appendChild(totalRow);
+      
+      // Update recipe analysis
+      if (state.doughRecipe.analysis) {
+        domElements.printDoughDetails.innerHTML = `
+          <p>Hydration: ${Math.round(state.doughRecipe.analysis.hydration)}%</p>
+          <p>Salt: ${state.doughRecipe.analysis.salt.toFixed(1)}%</p>
+          <p>Oil: ${state.doughRecipe.analysis.oil.toFixed(1)}%</p>
+          <p>Yeast: ${state.doughRecipe.analysis.yeast.toFixed(1)}%</p>
+          <p>Sugar: ${state.doughRecipe.analysis.sugar.toFixed(1)}%</p>
         `;
-        
-        // Calculate scaling factor for za'atar
-        const totalNeeded = state.toppings.zaatar.servings * state.toppings.zaatar.perPiece;
-        const batches = state.toppings.zaatar.totalWeight > 0 ? totalNeeded / state.toppings.zaatar.totalWeight : 0;
-        
-        // Add za'atar ingredients
-        state.toppings.zaatar.ingredients.forEach(ingredient => {
-          const scaledAmount = Math.round(ingredient.amount * batches);
-          boqHtml += `
-            <tr>
-              <td></td>
-              <td>${ingredient.name}</td>
-              <td>${scaledAmount}</td>
-              <td>g</td>
-            </tr>
-          `;
-        });
       }
       
-      // Add Cheese section
-      if (state.toppings.cheese.servings > 0) {
-        boqHtml += `
-          <tr class="category-row">
-            <td colspan="4">Cheese Topping</td>
-          </tr>
+      // Update batch information
+      if (state.batchInfo) {
+        domElements.printBatchDetails.innerHTML = `
+          <p>Number of Dough Balls: ${state.batchInfo.balls}</p>
+          <p>Weight per Ball: ${state.batchInfo.ballWeight}g</p>
+          <p>Total Batch Weight: ${state.batchInfo.totalWeight}g</p>
+          <p>Total Batch Cost: ${formatPrice(state.batchInfo.totalCost, currency)}</p>
         `;
-        
-        // Calculate total needed
-        const totalNeeded = state.toppings.cheese.servings * state.toppings.cheese.perPiece;
-        
-        // Add cheese types
-        state.toppings.cheese.cheeseTypes.forEach(cheese => {
-          const amount = Math.round((cheese.percent / 100) * totalNeeded);
-          boqHtml += `
-            <tr>
-              <td></td>
-              <td>${cheese.name}</td>
-              <td>${amount}</td>
-              <td>g</td>
-            </tr>
-          `;
-        });
       }
       
-      // Add Meat section
-      if (state.toppings.meat.servings > 0) {
-        boqHtml += `
-          <tr class="category-row">
-            <td colspan="4">Meat Topping</td>
-          </tr>
-        `;
-        
-        // Calculate scaling factor for meat
-        const totalNeeded = state.toppings.meat.servings * state.toppings.meat.perPiece;
-        const batches = state.toppings.meat.totalWeight > 0 ? totalNeeded / state.toppings.meat.totalWeight : 0;
-        
-        // Add meat ingredients
-        state.toppings.meat.ingredients.forEach(ingredient => {
-          const scaledAmount = Math.round(ingredient.amount * batches);
-          boqHtml += `
-            <tr>
-              <td></td>
-              <td>${ingredient.name}</td>
-              <td>${scaledAmount}</td>
-              <td>g</td>
-            </tr>
-          `;
-        });
-      }
-      
-      // Add Banana section
-      if (state.toppings.banana.servings > 0) {
-        boqHtml += `
-          <tr class="category-row">
-            <td colspan="4">Chocolate Banana Topping</td>
-          </tr>
-        `;
-        
-        // Calculate scaling factor for banana
-        const totalNeeded = state.toppings.banana.servings * state.toppings.banana.perPiece;
-        const batches = state.toppings.banana.totalWeight > 0 ? totalNeeded / state.toppings.banana.totalWeight : 0;
-        
-        // Add banana ingredients
-        state.toppings.banana.ingredients.forEach(ingredient => {
-          const scaledAmount = Math.round(ingredient.amount * batches);
-          boqHtml += `
-            <tr>
-              <td></td>
-              <td>${ingredient.name}</td>
-              <td>${scaledAmount}</td>
-              <td>g</td>
-            </tr>
-          `;
-        });
-      }
-      
-      // End table
-      boqHtml += `</tbody>`;
-      
-      domElements.printBoqTable.innerHTML = boqHtml;
+      // Update date
+      const now = new Date();
+      domElements.printDate.textContent = now.toLocaleDateString();
+    } catch (error) {
+      console.error('Error updating print view:', error);
     }
   }
   
@@ -2411,6 +1777,7 @@ document.addEventListener("DOMContentLoaded", function() {
     initTabs();
     initPriceToggles();
     initDoughCalculator();
+    initMenuItems();
     initZaatarCalculator();
     initCheeseCalculator();
     initMeatCalculator();
@@ -2418,8 +1785,1159 @@ document.addEventListener("DOMContentLoaded", function() {
     initShareAndPrint();
   }
   
+  // Menu Items Management
+  function initMenuItems() {
+    // Move existing sections into the container
+    moveExistingSectionsToContainer();
+    
+    // Add Event Listeners
+    document.getElementById('addMenuItemBtn').addEventListener('click', showAddMenuItemForm);
+    document.getElementById('saveMenuItem').addEventListener('click', saveMenuItem);
+    document.getElementById('cancelMenuItem').addEventListener('click', hideAddMenuItemForm);
+    
+    // Add event listeners to all remove buttons
+    document.querySelectorAll('.remove-menu-item-button').forEach(button => {
+      button.addEventListener('click', removeMenuItem);
+    });
+    
+    // Add event listeners to all edit buttons
+    document.querySelectorAll('.edit-menu-item-button').forEach(button => {
+      button.addEventListener('click', showEditMenuItemForm);
+    });
+    
+    // Add event listeners to all save edit buttons
+    document.querySelectorAll('.save-edit-button').forEach(button => {
+      button.addEventListener('click', function() {
+        const section = this.closest('.menu-item-section');
+        const id = section.getAttribute('data-menu-item');
+        saveEditMenuItem(this, id);
+      });
+    });
+    
+    // Add event listeners to all cancel edit buttons
+    document.querySelectorAll('.cancel-edit-button').forEach(button => {
+      button.addEventListener('click', function() {
+        hideEditMenuItemForm(this);
+      });
+    });
+    
+    // Set up the icon selector radio buttons to update the hidden select
+    document.querySelectorAll('.icon-option').forEach(radio => {
+      radio.addEventListener('change', function() {
+        if (this.checked) {
+          // For add form
+          if (this.name === 'menuIcon') {
+            document.getElementById('menuItemIcon').value = this.value;
+          } 
+          // For edit forms
+          else {
+            const section = this.closest('.menu-item-section');
+            const selectElement = section.querySelector('.edit-menu-item-icon');
+            selectElement.value = this.value;
+          }
+        }
+      });
+    });
+    
+    // Initially set the correct icons as selected based on existing menu items
+    initializeIconSelectors();
+  }
+
+  // Add this function to initialize the visual icon selectors for existing menu items
+  function initializeIconSelectors() {
+    document.querySelectorAll('.menu-item-section').forEach(section => {
+      const id = section.getAttribute('data-menu-item');
+      const iconElement = section.querySelector('.section-title i');
+      const iconClass = iconElement.className;
+      
+      // Find the matching radio button and select it
+      const radios = section.querySelectorAll('.icon-option');
+      radios.forEach(radio => {
+        if (radio.value === iconClass) {
+          radio.checked = true;
+        }
+      });
+      
+      // Update the hidden select
+      const selectElement = section.querySelector('.edit-menu-item-icon');
+      if (selectElement) {
+        selectElement.value = iconClass;
+      }
+    });
+  }
+
+  function saveMenuItem() {
+    const name = document.getElementById('menuItemName').value.trim();
+    
+    // Get the selected icon from the radio buttons
+    let iconClass = document.getElementById('menuItemIcon').value; // Default to the hidden field value
+    const selectedRadio = document.querySelector('input[name="menuIcon"]:checked');
+    if (selectedRadio) {
+      iconClass = selectedRadio.value;
+    }
+    
+    if (!name) {
+      alert('Please enter a name for the menu item');
+      return;
+    }
+    
+    // Create a unique ID for the new menu item
+    const menuItemId = name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+    
+    // Check if it already exists
+    if (document.querySelector(`[data-menu-item="${menuItemId}"]`)) {
+      alert('A menu item with this name already exists');
+      return;
+    }
+    
+    // Create the new menu item
+    createNewMenuItem(menuItemId, name, iconClass);
+    
+    // Hide the form
+    hideAddMenuItemForm();
+  }
   
+  // Add this function to show the edit form
+  function showEditMenuItemForm(event) {
+    const section = event.currentTarget.closest('.menu-item-section');
+    const editForm = section.querySelector('.edit-menu-item-form');
+    
+    // Set the current icon in the form
+    const currentIcon = section.querySelector('.section-title i').className;
+    const radioButtons = section.querySelectorAll('.icon-option');
+    radioButtons.forEach(radio => {
+      if (radio.value === currentIcon) {
+        radio.checked = true;
+      }
+    });
+    
+    editForm.style.display = 'block';
+  }
+
+  // Add this function to save the edit
+  function saveEditMenuItem(buttonElement, id) {
+    const section = buttonElement.closest('.menu-item-section');
+    const nameInput = section.querySelector('.edit-menu-item-name');
+    
+    // Get the selected icon from the radio buttons
+    let newIcon = '';
+    const radioButtons = section.querySelectorAll('.icon-option');
+    radioButtons.forEach(radio => {
+      if (radio.checked) {
+        newIcon = radio.value;
+      }
+    });
+    
+    // If no radio button is checked, use the value from the hidden select
+    if (!newIcon) {
+      const selectElement = section.querySelector('.edit-menu-item-icon');
+      newIcon = selectElement.value;
+    }
+    
+    const newName = nameInput.value.trim();
+    
+    if (!newName) {
+      alert('Please enter a name for the menu item');
+      return;
+    }
+    
+    // Update the title
+    const titleElement = section.querySelector('.section-title');
+    titleElement.innerHTML = `<i class="${newIcon}"></i> ${newName} Topping`;
+    
+    // Update the ingredients heading
+    const ingredientsHeading = section.querySelector('.topping-card h4');
+    ingredientsHeading.textContent = `${newName} Mix Ingredients`;
+    
+    // Hide the edit form
+    hideEditMenuItemForm(buttonElement);
+    
+    // Update state and recalculate if needed
+    calculateCustomIngredients(id);
+  }
+
+  function createNewMenuItem(id, name, iconClass) {
+    const container = document.getElementById('menu-items-container');
+    
+    // Create the new section
+    const section = document.createElement('div');
+    section.className = 'calculator-section menu-item-section';
+    section.setAttribute('data-menu-item', id);
+    
+    // Create the section HTML with the visual icon selector
+    section.innerHTML = `
+      <div class="section-header">
+        <h2 class="section-title">
+          <i class="${iconClass}"></i> ${name} Topping
+        </h2>
+        <div class="section-header-buttons">
+          <button class="edit-menu-item-button"><i class="fa fa-pen"></i></button>
+          <button class="remove-menu-item-button"><i class="fa fa-trash"></i></button>
+        </div>
+      </div>
+      
+      <div class="edit-menu-item-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Select Icon</label>
+            <div class="icon-selector-container">
+              <input type="radio" name="${id}Icon" id="${id}-icon-cheese" class="icon-option" value="fas fa-cheese">
+              <label for="${id}-icon-cheese"><i class="fas fa-cheese"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-meat" class="icon-option" value="fas fa-drumstick-bite">
+              <label for="${id}-icon-meat"><i class="fas fa-drumstick-bite"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-sweet" class="icon-option" value="fas fa-cookie">
+              <label for="${id}-icon-sweet"><i class="fas fa-cookie"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-vegetable" class="icon-option" value="fas fa-leaf">
+              <label for="${id}-icon-vegetable"><i class="fas fa-leaf"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-pizza" class="icon-option" value="fas fa-pizza-slice">
+              <label for="${id}-icon-pizza"><i class="fas fa-pizza-slice"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-bread" class="icon-option" value="fas fa-bread-slice">
+              <label for="${id}-icon-bread"><i class="fas fa-bread-slice"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-spicy" class="icon-option" value="fas fa-pepper-hot">
+              <label for="${id}-icon-spicy"><i class="fas fa-pepper-hot"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-herbs" class="icon-option" value="fas fa-seedling">
+              <label for="${id}-icon-herbs"><i class="fas fa-seedling"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-breakfast" class="icon-option" value="fas fa-egg">
+              <label for="${id}-icon-breakfast"><i class="fas fa-egg"></i></label>
+              
+              <input type="radio" name="${id}Icon" id="${id}-icon-fruit" class="icon-option" value="fas fa-apple-alt">
+              <label for="${id}-icon-fruit"><i class="fas fa-apple-alt"></i></label>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="${id}-name">Menu Item Name</label>
+            <input type="text" id="${id}-name" class="edit-menu-item-name" value="${name}" placeholder="Menu Item Name" />
+          </div>
+          
+          <!-- Keep the hidden dropdown for compatibility with existing JS -->
+          <select class="edit-menu-item-icon" style="display: none;">
+            <option value="fas fa-cheese">Cheese</option>
+            <option value="fas fa-drumstick-bite">Meat</option>
+            <option value="fas fa-cookie">Sweet</option>
+            <option value="fas fa-leaf">Vegetable</option>
+            <option value="fas fa-pizza-slice">Pizza</option>
+            <option value="fas fa-bread-slice">Bread</option>
+            <option value="fas fa-pepper-hot">Spicy</option>
+            <option value="fas fa-seedling">Herbs</option>
+            <option value="fas fa-egg">Breakfast</option>
+            <option value="fas fa-apple-alt">Fruit</option>
+          </select>
+        </div>
+        <div class="form-row buttons-row">
+          <button class="save-edit-button add-item-button">
+            <i class="fas fa-save"></i> Save Changes
+          </button>
+          <button class="cancel-edit-button remove-item-button">
+            <i class="fas fa-times"></i> Cancel
+          </button>
+        </div>
+      </div>
+      
+      <div class="topping-card">
+        <div class="controls">
+          <div class="control-group">
+            <label for="${id}Servings">Number of Manakish:</label>
+            <input
+              type="number"
+              id="${id}Servings"
+              value="8"
+              min="1"
+              max="100"
+            />
+          </div>
+        </div>
+        <hr class="dotted-divider" />
+        <h4>${name} Mix Ingredients</h4>
+
+        <div id="${id}-ingredients-container">
+          <table id="${id}-ingredients-table">
+            <thead>
+              <tr>
+                <th>Ingredient</th>
+                <th>Per Manakish (g)</th>
+                <th>Total Amount (g)</th>
+                <th class="price-column">Price/kg</th>
+                <th class="price-column">Total Cost</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="total-row">
+                <td>Total</td>
+                <td></td>
+                <td class="${id}-total-amount" id="${id}MixWeight">0g</td>
+                <td class="price-column"></td>
+                <td class="price-column" id="${id}MixCost">$0.00</td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="margin-top: 10px">
+            <button id="add${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient" class="add-item-button">
+              <i class="fas fa-plus"></i> Add Ingredient
+            </button>
+          </div>
+
+          <div
+            id="${id}IngredientForm"
+            style="display: none; margin-top: 15px"
+          >
+            <div class="custom-ingredient-row">
+              <input
+                type="text"
+                id="${id}IngredientName"
+                class="custom-ingredient-name"
+                placeholder="Ingredient Name"
+              />
+              <input
+                type="number"
+                id="${id}IngredientAmount"
+                class="custom-ingredient-weight"
+                placeholder="Amount (g)"
+                min="0"
+              />
+              <input
+                type="number"
+                id="${id}IngredientPrice"
+                class="custom-ingredient-price price-input"
+                placeholder="Price/kg"
+                min="0"
+                step="0.1"
+              />
+              <button id="save${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient" class="add-item-button">
+                Add
+              </button>
+              <button
+                id="cancel${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient"
+                class="remove-item-button"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="${id}Result" class="servings-info"></div>
+      </div>
+    `;
+    
+    // Add the section to the DOM
+    container.appendChild(section);
+    
+    // Set the selected icon radio button
+    const radioButton = section.querySelector(`.icon-option[value="${iconClass}"]`);
+    if (radioButton) {
+      radioButton.checked = true;
+    }
+    
+    // Set the value in the hidden select
+    const selectElement = section.querySelector('.edit-menu-item-icon');
+    if (selectElement) {
+      selectElement.value = iconClass;
+    }
+    
+    // Add event listeners
+    section.querySelector('.remove-menu-item-button').addEventListener('click', removeMenuItem);
+    section.querySelector('.edit-menu-item-button').addEventListener('click', showEditMenuItemForm);
+    section.querySelector('.save-edit-button').addEventListener('click', function() {
+      saveEditMenuItem(this, id);
+    });
+    section.querySelector('.cancel-edit-button').addEventListener('click', function() {
+      hideEditMenuItemForm(this);
+    });
+    
+    // Add event listeners to the radio buttons
+    section.querySelectorAll('.icon-option').forEach(radio => {
+      radio.addEventListener('change', function() {
+        if (this.checked) {
+          selectElement.value = this.value;
+        }
+      });
+    });
+    
+    // Initialize calculator for this menu item
+    initCustomIngredientCalculator(id, name);
+  }
+
+  function moveExistingSectionsToContainer() {
+    const container = document.getElementById('menu-items-container');
+    
+    // Get the preset sections
+    const zaatarSection = document.querySelector('[data-menu-item="zaatar"]');
+    const cheeseSection = document.querySelector('[data-menu-item="cheese"]');
+    const meatSection = document.querySelector('[data-menu-item="meat"]');
+    const bananaSection = document.querySelector('[data-menu-item="banana"]');
+    
+    // If they exist in the original places, move them to the container
+    if (zaatarSection && cheeseSection && meatSection && bananaSection) {
+      container.appendChild(zaatarSection);
+      container.appendChild(cheeseSection);
+      container.appendChild(meatSection);
+      container.appendChild(bananaSection);
+    }
+  }
+
+  function showAddMenuItemForm() {
+    document.getElementById('add-menu-item-form').style.display = 'block';
+    document.getElementById('menuItemName').focus();
+  }
+
+  function hideAddMenuItemForm() {
+    document.getElementById('add-menu-item-form').style.display = 'none';
+    document.getElementById('menuItemName').value = '';
+  }
+
+  function removeMenuItem(event) {
+    const section = event.currentTarget.closest('.menu-item-section');
+    const menuItemId = section.getAttribute('data-menu-item');
+    
+    // Don't allow removing all menu items
+    const remainingMenuItems = document.querySelectorAll('.menu-item-section').length;
+    if (remainingMenuItems <= 1) {
+      alert('You must have at least one menu item');
+      return;
+    }
+    
+    // Confirm removal
+    if (confirm(`Are you sure you want to remove the ${menuItemId.charAt(0).toUpperCase() + menuItemId.slice(1)} section?`)) {
+      section.remove();
+      updateSummary();
+    }
+  }
+
+  function initCustomIngredientCalculator(id, name) {
+    // Add event listeners to inputs
+    const servingsInput = document.getElementById(`${id}Servings`);
+    servingsInput.addEventListener('input', debounce(() => calculateCustomIngredients(id)));
+    
+    // Add event listeners for the add ingredient button
+    const addButton = document.getElementById(`add${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient`);
+    addButton.addEventListener('click', () => {
+      document.getElementById(`${id}IngredientForm`).style.display = 'block';
+      document.getElementById(`${id}IngredientName`).focus();
+    });
+    
+    // Add event listeners for the save and cancel buttons
+    const saveButton = document.getElementById(`save${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient`);
+    saveButton.addEventListener('click', () => {
+      const ingredientName = document.getElementById(`${id}IngredientName`).value.trim();
+      const amount = parseFloat(document.getElementById(`${id}IngredientAmount`).value) || 0;
+      const price = parseFloat(document.getElementById(`${id}IngredientPrice`).value) || 0;
+      
+      if (ingredientName && amount > 0) {
+        addCustomIngredientRow(id, ingredientName, amount, price);
+        resetCustomIngredientForm(id);
+        calculateCustomIngredients(id);
+      }
+    });
+    
+    const cancelButton = document.getElementById(`cancel${id.charAt(0).toUpperCase() + id.slice(1)}Ingredient`);
+    cancelButton.addEventListener('click', () => {
+      resetCustomIngredientForm(id);
+    });
+  }
+
+  function resetCustomIngredientForm(id) {
+    document.getElementById(`${id}IngredientForm`).style.display = 'none';
+    document.getElementById(`${id}IngredientName`).value = '';
+    document.getElementById(`${id}IngredientAmount`).value = '';
+    document.getElementById(`${id}IngredientPrice`).value = '';
+  }
+
+  function addCustomIngredientRow(id, name, amount, price) {
+    const tbody = document.querySelector(`#${id}-ingredients-table tbody`);
+    const totalRow = tbody.querySelector('.total-row');
+    
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
+      <td>${name}</td>
+      <td><input type="number" class="${id}-ingredient-amount" value="${amount}" min="0"></td>
+      <td class="${id}-total-amount">0g</td>
+      <td class="price-column"><input type="number" class="price-input" value="${price}" min="0" step="0.1"></td>
+      <td class="price-column price-display">$0.00</td>
+      <td><button class="remove-item-button"><i class="fa fa-trash"></i></button></td>
+    `;
+    
+    // Add event listeners
+    newRow.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', debounce(() => calculateCustomIngredients(id)));
+    });
+    
+    newRow.querySelector('.remove-item-button').addEventListener('click', function() {
+      tbody.removeChild(newRow);
+      calculateCustomIngredients(id);
+    });
+    
+    // Insert before total row
+    tbody.insertBefore(newRow, totalRow);
+  }
+
+  function calculateCustomIngredients(id) {
+    try {
+      // Create state object if it doesn't exist
+      if (!state.toppings[id]) {
+        state.toppings[id] = {
+          servings: 0,
+          perPiece: 50, // Default 50g per piece
+          totalWeight: 0,
+          totalCost: 0,
+          ingredients: []
+        };
+      }
+      
+      // Reset values
+      state.toppings[id].ingredients = [];
+      state.toppings[id].totalWeight = 0;
+      state.toppings[id].totalCost = 0;
+      
+      // Get inputs
+      const servings = parseInt(document.getElementById(`${id}Servings`).value) || 0;
+      state.toppings[id].servings = servings;
+      
+      // Process each ingredient row
+      const ingredientRows = document.querySelectorAll(`#${id}-ingredients-table tbody tr:not(.total-row)`);
+      ingredientRows.forEach(row => {
+        const nameCell = row.cells[0].textContent;
+        const amountInput = row.querySelector(`.${id}-ingredient-amount`);
+        const totalAmountCell = row.querySelector(`.${id}-total-amount`);
+        const priceInput = row.querySelector('.price-input');
+        const priceDisplay = row.querySelector('.price-display');
+        
+        const amount = parseFloat(amountInput.value) || 0;
+        const totalAmount = amount * servings;
+        
+        // Update total amount cell
+        if (totalAmountCell) totalAmountCell.textContent = totalAmount + 'g';
+        
+        const pricePerKg = parseFloat(priceInput.value) || 0;
+        const cost = (totalAmount / 1000) * pricePerKg;
+        updatePriceDisplay(priceDisplay, cost);
+        
+        state.toppings[id].totalWeight += totalAmount;
+        state.toppings[id].totalCost += cost;
+        
+        state.toppings[id].ingredients.push({
+          name: nameCell,
+          amount: amount,
+          totalAmount: totalAmount,
+          pricePerKg: pricePerKg,
+          cost: cost
+        });
+      });
+      
+      // Update totals
+      const totalWeightElement = document.getElementById(`${id}MixWeight`);
+      const totalCostElement = document.getElementById(`${id}MixCost`);
+      
+      if (totalWeightElement) {
+        totalWeightElement.textContent = `${Math.round(state.toppings[id].totalWeight)}g`;
+      }
+      
+      if (totalCostElement) {
+        updatePriceDisplay(totalCostElement, state.toppings[id].totalCost);
+      }
+      
+      // Update result info
+      const resultElement = document.getElementById(`${id}Result`);
+      if (resultElement) {
+        resultElement.innerHTML = `<strong>Total ${id} mix needed:</strong> ${Math.round(state.toppings[id].totalWeight)}g`;
+      }
+      
+      // Update summary if we're on that tab
+      if (state.activeTab === 'summary') {
+        updateSummary();
+      }
+    } catch (error) {
+      console.error(`Error in ${id} calculation:`, error);
+    }
+  }
   
   // Start the application
   init();
+
+  // Add this to your calculator.js file
+  function adjustTitleWidth() {
+    const title = document.querySelector('h1');
+    const subtitle = document.querySelector('.subtitle');
+    
+    // Wait for fonts to load to get accurate measurements
+    document.fonts.ready.then(() => {
+        const titleWidth = title.offsetWidth;
+        const subtitleWidth = subtitle.offsetWidth;
+        
+        if (titleWidth !== subtitleWidth) {
+            const currentLetterSpacing = parseFloat(getComputedStyle(title).letterSpacing);
+            const adjustment = (subtitleWidth - titleWidth) / (title.textContent.length - 1);
+            title.style.letterSpacing = `${currentLetterSpacing + adjustment}px`;
+        }
+    });
+}
+
+  // Call this after DOM loads and on window resize
+  window.addEventListener('DOMContentLoaded', adjustTitleWidth);
+  window.addEventListener('resize', adjustTitleWidth);
+
+  domElements.globalCurrencySelector.addEventListener('change', function() {
+    updateAllPrices();
+  });
+
+  function updateAllPrices() {
+    const currency = domElements.globalCurrencySelector.value;
+    
+    // Update all price displays
+    document.querySelectorAll('.price-display').forEach(display => {
+      const amount = parseFloat(display.getAttribute('data-amount') || display.textContent.replace(/[^0-9.-]+/g, ''));
+      if (!isNaN(amount)) {
+        display.textContent = formatPrice(amount, currency);
+      }
+    });
+  }
+
+  // Modify your existing price calculation functions to use the new formatPrice function
+  function calculateIngredientCost(weight, pricePerKg) {
+    const cost = (weight / 1000) * pricePerKg;
+    return cost;
+  }
+
+  function updatePriceDisplay(element, cost) {
+    const currency = domElements.globalCurrencySelector.value;
+    element.setAttribute('data-amount', cost);
+    element.textContent = formatPrice(cost, currency);
+  }
+
+  function calculateZaatarMix() {
+    try {
+      let totalWeight = 0;
+      let totalCost = 0;
+      
+      domElements.zaatarIngredientAmounts.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        const priceInput = input.closest('tr').querySelector('.price-input');
+        const pricePerKg = parseFloat(priceInput.value) || 0;
+        const cost = calculateIngredientCost(amount, pricePerKg);
+        
+        // Update price display with currency
+        const priceDisplay = input.closest('tr').querySelector('.price-display');
+        updatePriceDisplay(priceDisplay, cost);
+        
+        totalWeight += amount;
+        totalCost += cost;
+      });
+      
+      // Update total weight and cost displays with currency
+      domElements.zaatarMixWeight.textContent = `${totalWeight}g`;
+      updatePriceDisplay(domElements.zaatarMixCost, totalCost);
+      
+      // Update batch information
+      updateBatch();
+    } catch (error) {
+      console.error('Error in zaatar mix calculation:', error);
+    }
+  }
+
+  function calculateCheeseMix() {
+    try {
+      let totalPercent = 0;
+      let totalCost = 0;
+      const totalWeight = 1000; // 1kg base weight
+      
+      domElements.cheeseIngredientPercents.forEach(input => {
+        const percent = parseFloat(input.value) || 0;
+        const priceInput = input.closest('tr').querySelector('.price-input');
+        const pricePerKg = parseFloat(priceInput.value) || 0;
+        const weight = (percent / 100) * totalWeight;
+        const cost = calculateIngredientCost(weight, pricePerKg);
+        
+        // Update price display with currency
+        const priceDisplay = input.closest('tr').querySelector('.price-display');
+        updatePriceDisplay(priceDisplay, cost);
+        
+        totalPercent += percent;
+        totalCost += cost;
+      });
+      
+      // Update total percent and cost displays with currency
+      domElements.cheesePercentTotal.textContent = `${totalPercent}%`;
+      updatePriceDisplay(domElements.cheeseMixCost, totalCost);
+      
+      // Update batch information
+      updateBatch();
+    } catch (error) {
+      console.error('Error in cheese mix calculation:', error);
+    }
+  }
+
+  function calculateMeatMix() {
+    try {
+      let totalWeight = 0;
+      let totalCost = 0;
+      
+      domElements.meatIngredientAmounts.forEach(input => {
+        const amount = parseFloat(input.value) || 0;
+        const priceInput = input.closest('tr').querySelector('.price-input');
+        const pricePerKg = parseFloat(priceInput.value) || 0;
+        const cost = calculateIngredientCost(amount, pricePerKg);
+        
+        // Update price display with currency
+        const priceDisplay = input.closest('tr').querySelector('.price-display');
+        updatePriceDisplay(priceDisplay, cost);
+        
+        totalWeight += amount;
+        totalCost += cost;
+      });
+      
+      // Update total weight and cost displays with currency
+      domElements.meatMixWeight.textContent = `${totalWeight}g`;
+      updatePriceDisplay(domElements.meatMixCost, totalCost);
+      
+      // Update batch information
+      updateBatch();
+    } catch (error) {
+      console.error('Error in meat mix calculation:', error);
+    }
+  }
+
+  function hideEditMenuItemForm(buttonElement) {
+    const section = buttonElement.closest('.menu-item-section');
+    const editForm = section.querySelector('.edit-menu-item-form');
+    editForm.style.display = 'none';
+  }
+
+  function updateDoughSummary() {
+    const tbody = domElements.summaryDough;
+    tbody.innerHTML = '';
+    
+    // Get current currency
+    const currency = domElements.globalCurrencySelector.value || 'GBP';
+    
+    // Calculate scaling factor for batch
+    const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
+    const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
+    
+    // Add each dough ingredient
+    state.doughRecipe.ingredients.forEach(ingredient => {
+      const scaledWeight = Math.round(ingredient.weight * scalingFactor);
+      const scaledCost = ingredient.cost * scalingFactor;
+      
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${ingredient.name}</td>
+        <td>${scaledWeight}g</td>
+        <td class="price-column">${formatPrice(scaledCost, currency)}</td>
+      `;
+      tbody.appendChild(row);
+    });
+    
+    // Add total row
+    const totalRow = document.createElement('tr');
+    totalRow.className = 'total-row';
+    
+    const scaledTotalCost = state.doughRecipe.totalCost * scalingFactor;
+    
+    totalRow.innerHTML = `
+      <td>Total Dough</td>
+      <td>${Math.round(totalBatchWeight)}g</td>
+      <td class="price-column">${formatPrice(scaledTotalCost, currency)}</td>
+    `;
+    tbody.appendChild(totalRow);
+    
+    // Add yield information
+    const yieldRow = document.createElement('tr');
+    yieldRow.className = 'info-row';
+    yieldRow.innerHTML = `
+      <td>Yield</td>
+      <td>${state.doughRecipe.batch.numBalls} dough balls (${state.doughRecipe.batch.ballWeight}g each)</td>
+      <td class="price-column"></td>
+    `;
+    tbody.appendChild(yieldRow);
+  }
+
+  // Add before the init() function
+  function updateToppingsSummary() {
+    const tbody = domElements.summaryToppings;
+    tbody.innerHTML = '';
+    
+    // Get current currency
+    const currency = domElements.globalCurrencySelector.value || 'GBP';
+    
+    // Add zaatar topping if it has ingredients
+    if (state.toppings.zaatar.ingredients && state.toppings.zaatar.ingredients.length > 0) {
+      // Section header
+      const sectionRow = document.createElement('tr');
+      sectionRow.className = 'section-row';
+      sectionRow.innerHTML = `
+        <td colspan="3">Za'atar Topping</td>
+      `;
+      tbody.appendChild(sectionRow);
+      
+      // Individual ingredients
+      state.toppings.zaatar.ingredients.forEach(ingredient => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${ingredient.name}</td>
+          <td>${ingredient.amount}g</td>
+          <td class="price-column">${formatPrice(ingredient.cost, currency)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      // Add subtotal
+      const subtotalRow = document.createElement('tr');
+      subtotalRow.className = 'subtotal-row';
+      subtotalRow.innerHTML = `
+        <td>Za'atar Subtotal</td>
+        <td>${state.toppings.zaatar.totalWeight}g</td>
+        <td class="price-column">${formatPrice(state.toppings.zaatar.totalCost, currency)}</td>
+      `;
+      tbody.appendChild(subtotalRow);
+    }
+    
+    // Add cheese topping if it has types
+    if (state.toppings.cheese.cheeseTypes && state.toppings.cheese.cheeseTypes.length > 0) {
+      // Section header
+      const sectionRow = document.createElement('tr');
+      sectionRow.className = 'section-row';
+      sectionRow.innerHTML = `
+        <td colspan="3">Cheese Topping</td>
+      `;
+      tbody.appendChild(sectionRow);
+      
+      // Individual cheese types
+      state.toppings.cheese.cheeseTypes.forEach(cheese => {
+        const row = document.createElement('tr');
+        const weight = (cheese.percent / 100) * 1000; // 1kg base weight
+        row.innerHTML = `
+          <td>${cheese.name}</td>
+          <td>${weight}g (${cheese.percent}%)</td>
+          <td class="price-column">${formatPrice(cheese.cost, currency)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      // Add subtotal
+      const subtotalRow = document.createElement('tr');
+      subtotalRow.className = 'subtotal-row';
+      subtotalRow.innerHTML = `
+        <td>Cheese Subtotal</td>
+        <td>1000g</td>
+        <td class="price-column">${formatPrice(state.toppings.cheese.totalCost, currency)}</td>
+      `;
+      tbody.appendChild(subtotalRow);
+    }
+    
+    // Add meat topping if it has ingredients
+    if (state.toppings.meat.ingredients && state.toppings.meat.ingredients.length > 0) {
+      // Section header
+      const sectionRow = document.createElement('tr');
+      sectionRow.className = 'section-row';
+      sectionRow.innerHTML = `
+        <td colspan="3">Meat Topping</td>
+      `;
+      tbody.appendChild(sectionRow);
+      
+      // Individual ingredients
+      state.toppings.meat.ingredients.forEach(ingredient => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${ingredient.name}</td>
+          <td>${ingredient.amount}g</td>
+          <td class="price-column">${formatPrice(ingredient.cost, currency)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      // Add subtotal
+      const subtotalRow = document.createElement('tr');
+      subtotalRow.className = 'subtotal-row';
+      subtotalRow.innerHTML = `
+        <td>Meat Subtotal</td>
+        <td>${state.toppings.meat.totalWeight}g</td>
+        <td class="price-column">${formatPrice(state.toppings.meat.totalCost, currency)}</td>
+      `;
+      tbody.appendChild(subtotalRow);
+    }
+    
+    // Add banana topping if it has ingredients
+    if (state.toppings.banana.ingredients && state.toppings.banana.ingredients.length > 0) {
+      // Section header
+      const sectionRow = document.createElement('tr');
+      sectionRow.className = 'section-row';
+      sectionRow.innerHTML = `
+        <td colspan="3">Chocolate-Banana Topping</td>
+      `;
+      tbody.appendChild(sectionRow);
+      
+      // Individual ingredients
+      state.toppings.banana.ingredients.forEach(ingredient => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${ingredient.name}</td>
+          <td>${ingredient.amount}g</td>
+          <td class="price-column">${formatPrice(ingredient.cost, currency)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+      
+      // Add subtotal
+      const subtotalRow = document.createElement('tr');
+      subtotalRow.className = 'subtotal-row';
+      subtotalRow.innerHTML = `
+        <td>Chocolate-Banana Subtotal</td>
+        <td>${state.toppings.banana.totalWeight}g</td>
+        <td class="price-column">${formatPrice(state.toppings.banana.totalCost, currency)}</td>
+      `;
+      tbody.appendChild(subtotalRow);
+    }
+    
+    // Add any custom toppings
+    Object.keys(state.customToppings || {}).forEach(id => {
+      const topping = state.customToppings[id];
+      
+      if (topping.ingredients && topping.ingredients.length > 0) {
+        // Section header
+        const sectionRow = document.createElement('tr');
+        sectionRow.className = 'section-row';
+        sectionRow.innerHTML = `
+          <td colspan="3">${topping.name} Topping</td>
+        `;
+        tbody.appendChild(sectionRow);
+        
+        // Individual ingredients
+        topping.ingredients.forEach(ingredient => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${ingredient.name}</td>
+            <td>${ingredient.amount}g</td>
+            <td class="price-column">${formatPrice(ingredient.cost, currency)}</td>
+          `;
+          tbody.appendChild(row);
+        });
+        
+        // Add subtotal
+        const subtotalRow = document.createElement('tr');
+        subtotalRow.className = 'subtotal-row';
+        subtotalRow.innerHTML = `
+          <td>${topping.name} Subtotal</td>
+          <td>${topping.totalWeight}g</td>
+          <td class="price-column">${formatPrice(topping.totalCost, currency)}</td>
+        `;
+        tbody.appendChild(subtotalRow);
+      }
+    });
+  }
+
+  function updateCostSummary() {
+  const tbody = domElements.summaryCosts;
+  tbody.innerHTML = '';
+  
+  // Get current currency
+  const currency = domElements.globalCurrencySelector.value || 'GBP';
+  
+  // Calculate dough cost per piece
+  const doughCostPerPiece = state.doughRecipe.batch.numBalls > 0 ? 
+    state.doughRecipe.totalCost / state.doughRecipe.batch.numBalls : 0;
+  
+  // Calculate total costs
+  const totalBatchWeight = state.doughRecipe.batch.numBalls * state.doughRecipe.batch.ballWeight;
+  const scalingFactor = state.doughRecipe.totalWeight > 0 ? totalBatchWeight / state.doughRecipe.totalWeight : 1;
+  const scaledDoughCost = state.doughRecipe.totalCost * scalingFactor;
+  
+  // Calculate all toppings cost
+  let totalToppingsCost = 0;
+  
+  // Add standard toppings
+  totalToppingsCost += state.toppings.zaatar.totalCost || 0;
+  totalToppingsCost += state.toppings.cheese.totalCost || 0;
+  totalToppingsCost += state.toppings.meat.totalCost || 0;
+  totalToppingsCost += state.toppings.banana.totalCost || 0;
+  
+  // Add custom toppings
+  Object.keys(state.customToppings || {}).forEach(id => {
+    totalToppingsCost += state.customToppings[id].totalCost || 0;
+  });
+  
+  // Calculate total project cost
+  const totalProjectCost = scaledDoughCost + totalToppingsCost;
+  
+  // Add dough cost
+  const doughRow = document.createElement('tr');
+  doughRow.innerHTML = `
+    <td>Dough</td>
+    <td class="price-column">${formatPrice(scaledDoughCost, currency)}</td>
+    <td class="price-column">${totalProjectCost > 0 ? ((scaledDoughCost / totalProjectCost) * 100).toFixed(1) : 0}%</td>
+  `;
+  tbody.appendChild(doughRow);
+  
+  // Add toppings cost row
+  const toppingsRow = document.createElement('tr');
+  toppingsRow.innerHTML = `
+    <td>Toppings</td>
+    <td class="price-column">${formatPrice(totalToppingsCost, currency)}</td>
+    <td class="price-column">${totalProjectCost > 0 ? ((totalToppingsCost / totalProjectCost) * 100).toFixed(1) : 0}%</td>
+  `;
+  tbody.appendChild(toppingsRow);
+  
+  // Add total row
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+  totalRow.innerHTML = `
+    <td>Total Project Cost</td>
+    <td class="price-column">${formatPrice(totalProjectCost, currency)}</td>
+    <td class="price-column">100%</td>
+  `;
+  tbody.appendChild(totalRow);
+  
+  // Add per-item cost rows
+  if (state.doughRecipe.batch.numBalls > 0) {
+    const itemCostHeader = document.createElement('tr');
+    itemCostHeader.className = 'section-row';
+    itemCostHeader.innerHTML = `
+      <td colspan="3">Cost Per Item</td>
+    `;
+    tbody.appendChild(itemCostHeader);
+    
+    // Add dough cost per piece
+    const doughItemRow = document.createElement('tr');
+    doughItemRow.innerHTML = `
+      <td>Dough (per piece)</td>
+      <td class="price-column">${formatPrice(doughCostPerPiece, currency)}</td>
+      <td></td>
+    `;
+    tbody.appendChild(doughItemRow);
+    
+    // Add za'atar cost per piece if set up
+    if (state.toppings.zaatar.perPiece > 0) {
+      const zaatarCostPerPiece = state.toppings.zaatar.servings > 0 ? 
+        state.toppings.zaatar.totalCost / state.toppings.zaatar.servings : 0;
+      
+      const zaatarRow = document.createElement('tr');
+      zaatarRow.innerHTML = `
+        <td>Za'atar (per piece)</td>
+        <td class="price-column">${formatPrice(zaatarCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(zaatarRow);
+      
+      // Add za'atar manakish total
+      const zaatarTotalRow = document.createElement('tr');
+      zaatarTotalRow.className = 'item-total-row';
+      zaatarTotalRow.innerHTML = `
+        <td>Za'atar Manakish Total</td>
+        <td class="price-column">${formatPrice(doughCostPerPiece + zaatarCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(zaatarTotalRow);
+    }
+    
+    // Add cheese cost per piece if set up
+    if (state.toppings.cheese.perPiece > 0) {
+      const cheeseCostPerPiece = state.toppings.cheese.servings > 0 ? 
+        state.toppings.cheese.totalCost / state.toppings.cheese.servings : 0;
+      
+      const cheeseRow = document.createElement('tr');
+      cheeseRow.innerHTML = `
+        <td>Cheese (per piece)</td>
+        <td class="price-column">${formatPrice(cheeseCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(cheeseRow);
+      
+      // Add cheese manakish total
+      const cheeseTotalRow = document.createElement('tr');
+      cheeseTotalRow.className = 'item-total-row';
+      cheeseTotalRow.innerHTML = `
+        <td>Cheese Manakish Total</td>
+        <td class="price-column">${formatPrice(doughCostPerPiece + cheeseCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(cheeseTotalRow);
+    }
+    
+    // Add meat cost per piece if set up
+    if (state.toppings.meat.perPiece > 0) {
+      const meatCostPerPiece = state.toppings.meat.servings > 0 ? 
+        state.toppings.meat.totalCost / state.toppings.meat.servings : 0;
+      
+      const meatRow = document.createElement('tr');
+      meatRow.innerHTML = `
+        <td>Meat (per piece)</td>
+        <td class="price-column">${formatPrice(meatCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(meatRow);
+      
+      // Add meat manakish total
+      const meatTotalRow = document.createElement('tr');
+      meatTotalRow.className = 'item-total-row';
+      meatTotalRow.innerHTML = `
+        <td>Meat Manakish Total</td>
+        <td class="price-column">${formatPrice(doughCostPerPiece + meatCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(meatTotalRow);
+    }
+    
+    // Add banana cost per piece if set up
+    if (state.toppings.banana.perPiece > 0) {
+      const bananaCostPerPiece = state.toppings.banana.servings > 0 ? 
+        state.toppings.banana.totalCost / state.toppings.banana.servings : 0;
+      
+      const bananaRow = document.createElement('tr');
+      bananaRow.innerHTML = `
+        <td>Chocolate-Banana (per piece)</td>
+        <td class="price-column">${formatPrice(bananaCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(bananaRow);
+      
+      // Add banana manakish total
+      const bananaTotalRow = document.createElement('tr');
+      bananaTotalRow.className = 'item-total-row';
+      bananaTotalRow.innerHTML = `
+        <td>Chocolate-Banana Manakish Total</td>
+        <td class="price-column">${formatPrice(doughCostPerPiece + bananaCostPerPiece, currency)}</td>
+        <td></td>
+      `;
+      tbody.appendChild(bananaTotalRow);
+    }
+    
+    // Add any custom toppings
+    Object.keys(state.customToppings || {}).forEach(id => {
+      const topping = state.customToppings[id];
+      
+      if (topping.perPiece > 0) {
+        const costPerPiece = topping.servings > 0 ? 
+          topping.totalCost / topping.servings : 0;
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${topping.name} (per piece)</td>
+          <td class="price-column">${formatPrice(costPerPiece, currency)}</td>
+          <td></td>
+        `;
+        tbody.appendChild(row);
+        
+        // Add custom topping manakish total
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'item-total-row';
+        totalRow.innerHTML = `
+          <td>${topping.name} Manakish Total</td>
+          <td class="price-column">${formatPrice(doughCostPerPiece + costPerPiece, currency)}</td>
+          <td></td>
+        `;
+        tbody.appendChild(totalRow);
+      }
+    });
+  }
+}
 });
