@@ -19,21 +19,312 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
     <link rel="stylesheet" href="css/styles.css" />
     <link rel="stylesheet" href="css/print.css" media="print" />
+    <style>
+      /* Modern Apple-inspired styles with original colors */
+      :root {
+        --primary-color: #e94e4e;  /* Original red color */
+        --secondary-color: #d43e3e; /* Darker red for hover */
+        --success-color: #4CAF50;  /* Green for add buttons */
+        --danger-color: #f44336;   /* Red for remove buttons */
+        --background-color: #faf8f3;
+        --card-background: #ffffff;
+        --text-primary: #333333;
+        --text-secondary: #666666;
+        --border-radius: 12px;
+        --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        --transition: all 0.3s ease;
+      }
+
+      body {
+        background-color: var(--background-color);
+        color: var(--text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+
+      .calculator-section {
+        background: var(--card-background);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow);
+        transition: var(--transition);
+        border-top: 3px solid var(--primary-color);
+      }
+
+      .calculator-section:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+
+      .section-title {
+        color: var(--primary-color);
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .section-title i {
+        color: var(--primary-color);
+      }
+
+      button {
+        background: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--border-radius);
+        font-weight: 500;
+        cursor: pointer;
+        transition: var(--transition);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      button:hover {
+        background: var(--secondary-color);
+        transform: translateY(-1px);
+      }
+
+      button.remove-item-button {
+        background: var(--danger-color);
+        border-radius: var(--border-radius); /* match other buttons */
+        padding: 0.75rem 1.25rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 90px;
+        justify-content: center;
+      }
+
+      button.remove-item-button:hover {
+        background: #d32f2f;
+      }
+
+      .add-item-button {
+        background: var(--success-color);
+      }
+
+      .add-item-button:hover {
+        background: #45a049;
+      }
+
+      input[type="number"],
+      input[type="text"] {
+        padding: 0.75rem;
+        border: 1px solid #E5E5E5;
+        border-radius: var(--border-radius);
+        font-size: 1rem;
+        transition: var(--transition);
+        width: 100%;
+      }
+
+      input[type="number"]:focus,
+      input[type="text"]:focus {
+        border-color: var(--primary-color);
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(233, 78, 78, 0.1);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 1rem 0;
+      }
+
+      th {
+        background: #f5f5f5;
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: var(--primary-color);
+      }
+
+      td {
+        padding: 1rem;
+        border-bottom: 1px solid #E5E5E5;
+      }
+
+      .tabs {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        background: var(--card-background);
+        padding: 1rem;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow);
+      }
+
+      .tabs-navigation {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .tab {
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--border-radius);
+        cursor: pointer;
+        transition: var(--transition);
+        font-weight: 500;
+      }
+
+      .tab.active {
+        background: var(--primary-color);
+        color: white;
+      }
+
+      .tab:hover:not(.active) {
+        background: rgba(233, 78, 78, 0.1);
+      }
+
+      .controls {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .control-group {
+        flex: 1;
+      }
+
+      .control-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+      }
+
+      .total-row {
+        background: #f5f5f5;
+        font-weight: 600;
+      }
+
+      .modal {
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+      }
+
+      .modal-content {
+        background: var(--card-background);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        margin: 2rem auto;
+        box-shadow: var(--shadow);
+      }
+
+      .toast {
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(10px);
+        border-radius: var(--border-radius);
+        padding: 1rem 1.5rem;
+      }
+
+      @media (max-width: 768px) {
+        .controls {
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .tabs {
+          flex-direction: column;
+          gap: 1rem;
+        }
+
+        .tabs-navigation {
+          width: 100%;
+          overflow-x: auto;
+          padding-bottom: 0.5rem;
+        }
+      }
+
+      /* Icon selector improvements */
+      .icon-selector-container {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-bottom: 0.5rem;
+      }
+      .icon-selector-container input[type="radio"] {
+        display: none;
+      }
+      .icon-selector-container label {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border: 2px solid #e0e0e0;
+        border-radius: var(--border-radius);
+        background: #fff;
+        cursor: pointer;
+        transition: border 0.2s, box-shadow 0.2s;
+        font-size: 1.5rem;
+        margin: 0;
+        box-shadow: none;
+        padding: 0;
+      }
+      .icon-selector-container input[type="radio"]:checked + label {
+        border: 2px solid var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(233, 78, 78, 0.1);
+        background: #fff5f5;
+      }
+      .icon-selector-container label i {
+        font-size: 1.5rem;
+        color: var(--primary-color);
+        margin: 0;
+      }
+    </style>
   </head>
   <body>
     <div class="container no-print">
-      <div style="height: 20px;"><!-- Extra space above the header --></div>
-      <div class="arabic-title">مناقيش</div>
-      <div class="title-group">
+      <div class="arabic-title" style="margin-top: -10px;">مناقيش</div>
+      <div class="title-group" style="margin-bottom: 10px;">
         <h1>Manakish</h1>
         <div class="subtitle">Dough & Toppings Calculator</div>
-    </div>
+      </div>
+      <div class="recipe-actions">
+        <button id="shareRecipe" class="share-button">
+          <i class="fas fa-share-alt"></i> Share Recipe
+        </button>
+        <button id="copyRecipe" class="copy-button">
+          <i class="fas fa-copy"></i> Copy Recipe
+        </button>
+        <button id="printRecipe" class="print-button">
+          <i class="fas fa-print"></i> Print Recipe
+        </button>
+      </div>
 
     <div class="container screen-only">
       <div class="tabs">
-        <div class="tab active" data-tab="dough">Dough Calculator</div>
-        <div class="tab" data-tab="toppings">Toppings Calculator</div>
-        <div class="tab" data-tab="summary">Summary/BOQ</div>
+        <div class="tabs-navigation">
+          <div class="tab active" data-tab="dough">Dough Calculator</div>
+          <div class="tab" data-tab="toppings">Toppings Calculator</div>
+          <div class="tab" data-tab="summary">Summary</div>
+        </div>
+        <div class="tabs-actions">
+          <button id="globalShowPricesBtn" class="price-toggle-button global-toggle">
+            <i class="fas fa-coins"></i> <span>Pricing</span>
+          </button>
+          <select id="globalCurrencySelector" class="currency-selector" style="display: none;">
+            <option value="GBP">£ (GBP)</option>
+            <option value="USD">$ (USD)</option>
+            <option value="EUR">€ (EUR)</option>
+          </select>
+        </div>
       </div>
 
       <div id="dough-tab" class="tab-content active">
@@ -41,12 +332,6 @@
           <h2 class="section-title">
             <i class="fas fa-bread-slice"></i> Recipe Input
           </h2>
-
-          <div class="show-prices-toggle">
-            <button id="showPricesBtn" class="add-item-button price-toggle-button">
-              <i class="fas fa-coins"></i> Show Prices
-            </button>
-          </div>
 
           <div id="dough-ingredients-container">
             <table id="dough-ingredients-table">
@@ -273,33 +558,51 @@
               </div>
             </div>
           </div>
+        </div>
 
-          <div class="batch-controls">
-            <h3>Batch Calculator</h3>
-            <div class="controls">
-              <div class="control-group">
-                <label for="doughBalls">Number of Dough Balls:</label>
-                <input
-                  type="number"
-                  id="doughBalls"
-                  value="8"
-                  min="1"
-                  max="100"
-                />
-              </div>
-              <div class="control-group">
-                <label for="ballWeight">Dough Ball Weight (g):</label>
-                <input
-                  type="number"
-                  id="ballWeight"
-                  value="107"
-                  min="50"
-                  max="500"
-                />
-              </div>
+        <div class="calculator-section">
+          <h2 class="section-title">
+            <i class="fas fa-balance-scale"></i> Batch Calculator
+          </h2>
+          <div class="controls">
+            <div class="control-group">
+              <label for="doughBalls">Number of Dough Balls:</label>
+              <input
+                type="number"
+                id="doughBalls"
+                value="8"
+                min="1"
+                max="100"
+              />
             </div>
-            <div id="batchResults"></div>
+            <div class="control-group">
+              <label for="ballWeight">Dough Ball Weight (g):</label>
+              <input
+                type="number"
+                id="ballWeight"
+                value="107"
+                min="50"
+                max="500"
+              />
+            </div>
           </div>
+          <div class="controls batch-divider-controls">
+            <div class="control-group">
+              <label for="numBatches">Divide Recipe into Batches:</label>
+              <input
+                type="number"
+                id="numBatches"
+                value="1"
+                min="1"
+                max="10"
+              />
+            </div>
+            <div class="control-group">
+              <label>Each Batch Weight:</label>
+              <div id="eachBatchWeight" class="value-display calculated-value">858g</div>
+            </div>
+          </div>
+          <div id="batchResults"></div>
         </div>
 
         <div class="results">
@@ -309,47 +612,26 @@
           <table id="recipeAnalysisTable">
             <thead>
               <tr>
-                <th>Metric</th>
-                <th>Value</th>
+                <th>Ingredient</th>
+                <th>Amount Per Batch</th>
+                <th>Total Amount</th>
+                <th>Baker's %</th>
               </tr>
             </thead>
+            <tbody id="recipe-analysis-body">
+              <!-- Ingredient rows will be populated by JavaScript -->
+            </tbody>
             <tbody>
-              <tr>
-                <td>Hydration (%)</td>
-                <td id="hydrationValue">65%</td>
-              </tr>
-              <tr>
-                <td>Salt (%)</td>
-                <td id="saltValue">2%</td>
-              </tr>
-              <tr>
-                <td>Oil (%)</td>
-                <td id="oilValue">3%</td>
-              </tr>
-              <tr>
-                <td>Yeast (%)</td>
-                <td id="yeastValue">0.6%</td>
-              </tr>
-              <tr>
-                <td>Sugar (%)</td>
-                <td id="sugarValue">1%</td>
+              <tr class="total-row">
+                <td>Total Dough</td>
+                <td id="perBatchWeight"></td>
+                <td id="totalScaledWeight"></td>
+                <td>100%</td>
               </tr>
             </tbody>
           </table>
 
           <div class="servings-info" id="totalDoughInfo"></div>
-        </div>
-
-        <div class="recipe-actions">
-          <button id="shareRecipe" class="share-button">
-            <i class="fas fa-share-alt"></i> Share Recipe
-          </button>
-          <button id="copyRecipe" class="copy-button">
-            <i class="fas fa-copy"></i> Copy Recipe
-          </button>
-          <button id="printRecipe" class="print-button">
-            <i class="fas fa-print"></i> Print Recipe
-          </button>
         </div>
 
         <div id="shareModal" class="modal">
@@ -370,905 +652,1243 @@
       <div id="toppings-tab" class="tab-content">
         <div class="calculator-section">
           <h2 class="section-title">
-            <i class="fas fa-cheese"></i> Za'atar Topping
+            <i class="fas fa-cheese"></i> Toppings Calculator
           </h2>
-          <div class="topping-card">
-            <h4>Za'atar Manakish</h4>
-            <div class="controls">
-              <div class="control-group">
-                <label for="zaatarServings">Number of Manakish:</label>
-                <input
-                  type="number"
-                  id="zaatarServings"
-                  value="8"
-                  min="1"
-                  max="100"
-                />
+          
+          <div id="add-menu-item-container" style="text-align: center; margin-bottom: 20px;">
+            <button id="addMenuItemBtn" class="add-item-button">
+              <i class="fas fa-plus"></i> Add New Menu Item
+            </button>
+          </div>
+          
+          <div id="add-menu-item-form">
+            <h4>Add New Menu Item</h4>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Select Icon</label>
+                <div class="icon-selector-container">
+                  <input type="radio" name="menuIcon" id="menuIcon-cheese" class="icon-option" value="fas fa-cheese" checked>
+                  <label for="menuIcon-cheese"><i class="fas fa-cheese"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-meat" class="icon-option" value="fas fa-drumstick-bite">
+                  <label for="menuIcon-meat"><i class="fas fa-drumstick-bite"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-sweet" class="icon-option" value="fas fa-cookie">
+                  <label for="menuIcon-sweet"><i class="fas fa-cookie"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-vegetable" class="icon-option" value="fas fa-leaf">
+                  <label for="menuIcon-vegetable"><i class="fas fa-leaf"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-pizza" class="icon-option" value="fas fa-pizza-slice">
+                  <label for="menuIcon-pizza"><i class="fas fa-pizza-slice"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-bread" class="icon-option" value="fas fa-bread-slice">
+                  <label for="menuIcon-bread"><i class="fas fa-bread-slice"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-spicy" class="icon-option" value="fas fa-pepper-hot">
+                  <label for="menuIcon-spicy"><i class="fas fa-pepper-hot"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-herbs" class="icon-option" value="fas fa-seedling">
+                  <label for="menuIcon-herbs"><i class="fas fa-seedling"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-breakfast" class="icon-option" value="fas fa-egg">
+                  <label for="menuIcon-breakfast"><i class="fas fa-egg"></i></label>
+                  
+                  <input type="radio" name="menuIcon" id="menuIcon-fruit" class="icon-option" value="fas fa-apple-alt">
+                  <label for="menuIcon-fruit"><i class="fas fa-apple-alt"></i></label>
+                </div>
               </div>
-              <div class="control-group">
-                <label for="zaatarPerPiece">Za'atar Mix per Piece (g):</label>
-                <input
-                  type="number"
-                  id="zaatarPerPiece"
-                  value="20"
-                  min="5"
-                  max="50"
-                />
+              
+              <div class="form-group">
+                <label for="menuItemName">Menu Item Name</label>
+                <input type="text" id="menuItemName" placeholder="Menu Item Name (e.g. Spinach)" />
               </div>
+              
+              <!-- Keep the hidden dropdown for compatibility with existing JS -->
+              <select id="menuItemIcon" style="display: none;">
+                <option value="fas fa-cheese">Cheese</option>
+                <option value="fas fa-drumstick-bite">Meat</option>
+                <option value="fas fa-cookie">Sweet</option>
+                <option value="fas fa-leaf">Vegetable</option>
+                <option value="fas fa-pizza-slice">Pizza</option>
+                <option value="fas fa-bread-slice">Bread</option>
+                <option value="fas fa-pepper-hot">Spicy</option>
+                <option value="fas fa-seedling">Herbs</option>
+                <option value="fas fa-egg">Breakfast</option>
+                <option value="fas fa-apple-alt">Fruit</option>
+              </select>
             </div>
-            <hr class="dotted-divider" />
-            <h4>Za'atar Mix Ingredients</h4>
-
-            <div class="show-prices-toggle">
-              <button id="showToppingPricesBtn" class="add-item-button price-toggle-button">
-                <i class="fas fa-coins"></i> Show Prices
+            <div class="form-row buttons-row">
+              <button id="saveMenuItem" class="add-item-button">
+                <i class="fas fa-save"></i> Add Menu Item
+              </button>
+              <button id="cancelMenuItem" class="remove-item-button">
+                <i class="fas fa-times"></i> Cancel
               </button>
             </div>
-
-            <div id="zaatar-ingredients-container">
-              <table id="zaatar-ingredients-table">
-                <thead>
-                  <tr>
-                    <th>Ingredient</th>
-                    <th>Amount (g)</th>
-                    <th class="price-column">Price/kg</th>
-                    <th class="price-column">Cost</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Za'atar Blend</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="zaatar-ingredient-amount"
-                        value="100"
-                        min="1"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="25"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$2.50</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Extra Sumac</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="zaatar-ingredient-amount"
-                        value="10"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="30"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.30</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Sesame Seeds</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="zaatar-ingredient-amount"
-                        value="20"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="15"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.30</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Olive Oil</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="zaatar-ingredient-amount"
-                        id="oliveProportion"
-                        value="130"
-                        min="50"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="12"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$1.56</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr class="total-row">
-                    <td>Total Mix</td>
-                    <td id="zaatarMixWeight">260g</td>
-                    <td class="price-column"></td>
-                    <td class="price-column" id="zaatarMixCost">$4.66</td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style="margin-top: 10px">
-                <button id="addZaatarIngredient" class="add-item-button">
-                  <i class="fas fa-plus"></i> Add Ingredient
-                </button>
+          </div>
+          
+          <div id="menu-items-container">
+            <!-- Za'atar Section -->
+            <div class="calculator-section menu-item-section" data-menu-item="zaatar">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <i class="fas fa-cheese"></i> Za'atar Topping
+                </h2>
+                <div class="section-header-buttons">
+                  <button class="edit-menu-item-button"><i class="fa fa-pen"></i></button>
+                  <button class="remove-menu-item-button"><i class="fa fa-trash"></i></button>
+                </div>
               </div>
-
-              <div
-                id="zaatarIngredientForm"
-                style="display: none; margin-top: 15px"
-              >
-                <div class="custom-ingredient-row">
-                  <input
-                    type="text"
-                    id="zaatarIngredientName"
-                    class="custom-ingredient-name"
-                    placeholder="Ingredient Name"
-                  />
-                  <input
-                    type="number"
-                    id="zaatarIngredientAmount"
-                    class="custom-ingredient-weight"
-                    placeholder="Amount (g)"
-                    min="0"
-                  />
-                  <input
-                    type="number"
-                    id="zaatarIngredientPrice"
-                    class="custom-ingredient-price price-input"
-                    placeholder="Price/kg"
-                    min="0"
-                    step="0.1"
-                  />
-                  <button id="saveZaatarIngredient" class="add-item-button">
-                    Add
+              
+              <div class="edit-menu-item-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Select Icon</label>
+                    <div class="icon-selector-container">
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-cheese" class="icon-option" value="fas fa-cheese" checked>
+                      <label for="zaatar-icon-cheese"><i class="fas fa-cheese"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-meat" class="icon-option" value="fas fa-drumstick-bite">
+                      <label for="zaatar-icon-meat"><i class="fas fa-drumstick-bite"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-sweet" class="icon-option" value="fas fa-cookie">
+                      <label for="zaatar-icon-sweet"><i class="fas fa-cookie"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-vegetable" class="icon-option" value="fas fa-leaf">
+                      <label for="zaatar-icon-vegetable"><i class="fas fa-leaf"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-pizza" class="icon-option" value="fas fa-pizza-slice">
+                      <label for="zaatar-icon-pizza"><i class="fas fa-pizza-slice"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-bread" class="icon-option" value="fas fa-bread-slice">
+                      <label for="zaatar-icon-bread"><i class="fas fa-bread-slice"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-spicy" class="icon-option" value="fas fa-pepper-hot">
+                      <label for="zaatar-icon-spicy"><i class="fas fa-pepper-hot"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-herbs" class="icon-option" value="fas fa-seedling">
+                      <label for="zaatar-icon-herbs"><i class="fas fa-seedling"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-breakfast" class="icon-option" value="fas fa-egg">
+                      <label for="zaatar-icon-breakfast"><i class="fas fa-egg"></i></label>
+                      
+                      <input type="radio" name="zaatarIcon" id="zaatar-icon-fruit" class="icon-option" value="fas fa-apple-alt">
+                      <label for="zaatar-icon-fruit"><i class="fas fa-apple-alt"></i></label>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="zaatar-name">Menu Item Name</label>
+                    <input type="text" id="zaatar-name" class="edit-menu-item-name" value="Za'atar" placeholder="Menu Item Name" />
+                  </div>
+                  
+                  <!-- Keep the hidden dropdown for compatibility with existing JS -->
+                  <select class="edit-menu-item-icon" style="display: none;">
+                    <option value="fas fa-cheese">Cheese</option>
+                    <option value="fas fa-drumstick-bite">Meat</option>
+                    <option value="fas fa-cookie">Sweet</option>
+                    <option value="fas fa-leaf">Vegetable</option>
+                    <option value="fas fa-pizza-slice">Pizza</option>
+                    <option value="fas fa-bread-slice">Bread</option>
+                    <option value="fas fa-pepper-hot">Spicy</option>
+                    <option value="fas fa-seedling">Herbs</option>
+                    <option value="fas fa-egg">Breakfast</option>
+                    <option value="fas fa-apple-alt">Fruit</option>
+                  </select>
+                </div>
+                <div class="form-row buttons-row">
+                  <button class="save-edit-button add-item-button">
+                    <i class="fas fa-save"></i> Save Changes
                   </button>
-                  <button
-                    id="cancelZaatarIngredient"
-                    class="remove-item-button"
+                  <button class="cancel-edit-button remove-item-button">
+                    <i class="fas fa-times"></i> Cancel
+                  </button>
+                </div>
+              </div>
+              
+              <div class="topping-card">
+                <div class="controls">
+                  <div class="control-group">
+                    <label for="zaatarServings">Number of Manakish:</label>
+                    <input
+                      type="number"
+                      id="zaatarServings"
+                      value="8"
+                      min="1"
+                      max="100"
+                    />
+                  </div>
+                </div>
+                <hr class="dotted-divider" />
+                <h4>Za'atar Mix Ingredients</h4>
+
+                <div id="zaatar-ingredients-container">
+                  <table id="zaatar-ingredients-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Per Manakish (g)</th>
+                        <th>Total Amount (g)</th>
+                        <th class="price-column">Price/kg</th>
+                        <th class="price-column">Cost</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Za'atar Blend</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="zaatar-ingredient-amount"
+                            value="100"
+                            min="1"
+                          />
+                        </td>
+                        <td class="zaatar-total-amount">100g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="25"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$2.50</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Extra Sumac</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="zaatar-ingredient-amount"
+                            value="10"
+                            min="0"
+                          />
+                        </td>
+                        <td class="zaatar-total-amount">10g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="30"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.30</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Sesame Seeds</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="zaatar-ingredient-amount"
+                            value="20"
+                            min="0"
+                          />
+                        </td>
+                        <td class="zaatar-total-amount">20g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="15"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.30</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Olive Oil</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="zaatar-ingredient-amount"
+                            id="oliveProportion"
+                            value="130"
+                            min="50"
+                          />
+                        </td>
+                        <td class="zaatar-total-amount">130g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="12"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$1.56</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr class="total-row">
+                        <td>Total</td>
+                        <td></td>
+                        <td class="zaatar-total-amount" id="zaatarMixWeight">260g</td>
+                        <td class="price-column"></td>
+                        <td class="price-column" id="zaatarMixCost">$4.66</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div style="margin-top: 10px">
+                    <button id="addZaatarIngredient" class="add-item-button">
+                      <i class="fas fa-plus"></i> Add Ingredient
+                    </button>
+                  </div>
+
+                  <div
+                    id="zaatarIngredientForm"
+                    style="display: none; margin-top: 15px"
                   >
-                    Cancel
+                    <div class="custom-ingredient-row">
+                      <input
+                        type="text"
+                        id="zaatarIngredientName"
+                        class="custom-ingredient-name"
+                        placeholder="Ingredient Name"
+                      />
+                      <input
+                        type="number"
+                        id="zaatarIngredientAmount"
+                        class="custom-ingredient-weight"
+                        placeholder="Amount (g)"
+                        min="0"
+                      />
+                      <input
+                        type="number"
+                        id="zaatarIngredientPrice"
+                        class="custom-ingredient-price price-input"
+                        placeholder="Price/kg"
+                        min="0"
+                        step="0.1"
+                      />
+                      <button id="saveZaatarIngredient" class="add-item-button">
+                        Add
+                      </button>
+                      <button
+                        id="cancelZaatarIngredient"
+                        class="remove-item-button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="zaatarResult" class="servings-info"></div>
+              </div>
+            </div>
+
+            <!-- Cheese Section -->
+            <div class="calculator-section menu-item-section" data-menu-item="cheese">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <i class="fas fa-cheese"></i> Cheese Topping
+                </h2>
+                <div class="section-header-buttons">
+                  <button class="edit-menu-item-button"><i class="fa fa-pen"></i></button>
+                  <button class="remove-menu-item-button"><i class="fa fa-trash"></i></button>
+                </div>
+              </div>
+              
+              <div class="edit-menu-item-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Select Icon</label>
+                    <div class="icon-selector-container">
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-cheese" class="icon-option" value="fas fa-cheese" checked>
+                      <label for="cheese-icon-cheese"><i class="fas fa-cheese"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-meat" class="icon-option" value="fas fa-drumstick-bite">
+                      <label for="cheese-icon-meat"><i class="fas fa-drumstick-bite"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-sweet" class="icon-option" value="fas fa-cookie">
+                      <label for="cheese-icon-sweet"><i class="fas fa-cookie"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-vegetable" class="icon-option" value="fas fa-leaf">
+                      <label for="cheese-icon-vegetable"><i class="fas fa-leaf"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-pizza" class="icon-option" value="fas fa-pizza-slice">
+                      <label for="cheese-icon-pizza"><i class="fas fa-pizza-slice"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-bread" class="icon-option" value="fas fa-bread-slice">
+                      <label for="cheese-icon-bread"><i class="fas fa-bread-slice"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-spicy" class="icon-option" value="fas fa-pepper-hot">
+                      <label for="cheese-icon-spicy"><i class="fas fa-pepper-hot"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-herbs" class="icon-option" value="fas fa-seedling">
+                      <label for="cheese-icon-herbs"><i class="fas fa-seedling"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-breakfast" class="icon-option" value="fas fa-egg">
+                      <label for="cheese-icon-breakfast"><i class="fas fa-egg"></i></label>
+                      
+                      <input type="radio" name="cheeseIcon" id="cheese-icon-fruit" class="icon-option" value="fas fa-apple-alt">
+                      <label for="cheese-icon-fruit"><i class="fas fa-apple-alt"></i></label>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="cheese-name">Menu Item Name</label>
+                    <input type="text" id="cheese-name" class="edit-menu-item-name" value="Cheese" placeholder="Menu Item Name" />
+                  </div>
+                  
+                  <!-- Keep the hidden dropdown for compatibility with existing JS -->
+                  <select class="edit-menu-item-icon" style="display: none;">
+                    <option value="fas fa-cheese">Cheese</option>
+                    <option value="fas fa-drumstick-bite">Meat</option>
+                    <option value="fas fa-cookie">Sweet</option>
+                    <option value="fas fa-leaf">Vegetable</option>
+                    <option value="fas fa-pizza-slice">Pizza</option>
+                    <option value="fas fa-bread-slice">Bread</option>
+                    <option value="fas fa-pepper-hot">Spicy</option>
+                    <option value="fas fa-seedling">Herbs</option>
+                    <option value="fas fa-egg">Breakfast</option>
+                    <option value="fas fa-apple-alt">Fruit</option>
+                  </select>
+                </div>
+                <div class="form-row buttons-row">
+                  <button class="save-edit-button add-item-button">
+                    <i class="fas fa-save"></i> Save Changes
+                  </button>
+                  <button class="cancel-edit-button remove-item-button">
+                    <i class="fas fa-times"></i> Cancel
                   </button>
                 </div>
               </div>
-            </div>
+              
+              <div class="topping-card">
+                <div class="controls">
+                  <div class="control-group">
+                    <label for="cheeseServings">Number of Manakish:</label>
+                    <input
+                      type="number"
+                      id="cheeseServings"
+                      value="8"
+                      min="1"
+                      max="100"
+                    />
+                  </div>
+                </div>
+                <hr class="dotted-divider" />
+                <h4>Cheese Mix</h4>
 
-            <div id="zaatarResult" class="servings-info"></div>
-          </div>
-        </div>
+                <div id="cheese-ingredients-container">
+                  <table id="cheese-ingredients-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Per Manakish (g)</th>
+                        <th>Total Amount (g)</th>
+                        <th class="price-column">Price/kg</th>
+                        <th class="price-column">Total Cost</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Akawi</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="cheese-ingredient-amount"
+                            value="40"
+                            min="0"
+                            max="100"
+                          />
+                        </td>
+                        <td class="cheese-total-amount">320g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="18"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$5.76</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Mozarella</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="cheese-ingredient-amount"
+                            value="30"
+                            min="0"
+                            max="100"
+                          />
+                        </td>
+                        <td class="cheese-total-amount">240g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="12"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$2.88</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Feta</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="cheese-ingredient-amount"
+                            value="30"
+                            min="0"
+                            max="100"
+                          />
+                        </td>
+                        <td class="cheese-total-amount">240g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="15"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$3.60</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr class="total-row">
+                        <td>Total</td>
+                        <td></td>
+                        <td class="cheese-total-amount">800g</td>
+                        <td class="price-column"></td>
+                        <td class="price-column" id="cheeseMixCost">$12.24</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-        <div class="calculator-section">
-          <h2 class="section-title">
-            <i class="fas fa-cheese"></i> Cheese Topping
-          </h2>
-          <div class="topping-card">
-            <h4>Cheese Manakish</h4>
-            <div class="controls">
-              <div class="control-group">
-                <label for="cheeseServings">Number of Manakish:</label>
-                <input
-                  type="number"
-                  id="cheeseServings"
-                  value="8"
-                  min="1"
-                  max="100"
-                />
-              </div>
-              <div class="control-group">
-                <label for="cheesePerPiece">Cheese per Piece (g):</label>
-                <input
-                  type="number"
-                  id="cheesePerPiece"
-                  value="50"
-                  min="20"
-                  max="100"
-                />
-              </div>
-            </div>
-            <hr class="dotted-divider" />
-            <h4>Cheese Mix</h4>
+                  <div style="margin-top: 10px">
+                    <button id="addCheeseIngredient" class="add-item-button">
+                      <i class="fas fa-plus"></i> Add Ingredient
+                    </button>
+                  </div>
 
-            <div id="cheese-ingredients-container">
-              <table id="cheese-ingredients-table">
-                <thead>
-                  <tr>
-                    <th>Cheese Type</th>
-                    <th>Proportion (%)</th>
-                    <th class="price-column">Price/kg</th>
-                    <th class="price-column">Cost</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Akawi</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="cheese-ingredient-percent"
-                        value="50"
-                        min="0"
-                        max="100"
-                        step="5"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="18"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$7.20</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Mozarella</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="cheese-ingredient-percent"
-                        value="25"
-                        min="0"
-                        max="100"
-                        step="5"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="12"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$2.40</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Feta</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="cheese-ingredient-percent"
-                        value="25"
-                        min="0"
-                        max="100"
-                        step="5"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="15"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$3.00</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr class="total-row">
-                    <td>Total Mix</td>
-                    <td id="cheesePercentTotal">100%</td>
-                    <td class="price-column"></td>
-                    <td class="price-column" id="cheeseMixCost">$12.60</td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style="margin-top: 10px">
-                <button id="addCheeseIngredient" class="add-item-button">
-                  <i class="fas fa-plus"></i> Add Cheese Type
-                </button>
-              </div>
-
-              <div
-                id="cheeseIngredientForm"
-                style="display: none; margin-top: 15px"
-              >
-                <div class="custom-ingredient-row">
-                  <input
-                    type="text"
-                    id="cheeseIngredientName"
-                    class="custom-ingredient-name"
-                    placeholder="Cheese Type"
-                  />
-                  <input
-                    type="number"
-                    id="cheeseIngredientPercent"
-                    class="custom-ingredient-weight"
-                    placeholder="Proportion (%)"
-                    min="0"
-                    max="100"
-                    step="5"
-                  />
-                  <input
-                    type="number"
-                    id="cheeseIngredientPrice"
-                    class="custom-ingredient-price price-input"
-                    placeholder="Price/kg"
-                    min="0"
-                    step="0.1"
-                  />
-                  <button id="saveCheeseIngredient" class="add-item-button">
-                    Add
-                  </button>
-                  <button
-                    id="cancelCheeseIngredient"
-                    class="remove-item-button"
+                  <div
+                    id="cheeseIngredientForm"
+                    style="display: none; margin-top: 15px"
                   >
-                    Cancel
+                    <div class="custom-ingredient-row">
+                      <input
+                        type="text"
+                        id="cheeseIngredientName"
+                        class="custom-ingredient-name"
+                        placeholder="Cheese Type"
+                      />
+                      <input
+                        type="number"
+                        id="cheeseIngredientAmount"
+                        class="custom-ingredient-weight"
+                        placeholder="Amount (g)"
+                        min="0"
+                      />
+                      <input
+                        type="number"
+                        id="cheeseIngredientPrice"
+                        class="custom-ingredient-price price-input"
+                        placeholder="Price/kg"
+                        min="0"
+                        step="0.1"
+                      />
+                      <button id="saveCheeseIngredient" class="add-item-button">
+                        Add
+                      </button>
+                      <button
+                        id="cancelCheeseIngredient"
+                        class="remove-item-button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="cheeseResult" class="servings-info"></div>
+              </div>
+            </div>
+
+            <!-- Meat Section -->
+            <div class="calculator-section menu-item-section" data-menu-item="meat">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <i class="fas fa-drumstick-bite"></i> Lahm bi Ajeen (Meat Topping)
+                </h2>
+                <div class="section-header-buttons">
+                  <button class="edit-menu-item-button"><i class="fa fa-pen"></i></button>
+                  <button class="remove-menu-item-button"><i class="fa fa-trash"></i></button>
+                </div>
+              </div>
+              
+              <div class="edit-menu-item-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Select Icon</label>
+                    <div class="icon-selector-container">
+                      <input type="radio" name="meatIcon" id="meat-icon-cheese" class="icon-option" value="fas fa-cheese">
+                      <label for="meat-icon-cheese"><i class="fas fa-cheese"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-meat" class="icon-option" value="fas fa-drumstick-bite" checked>
+                      <label for="meat-icon-meat"><i class="fas fa-drumstick-bite"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-sweet" class="icon-option" value="fas fa-cookie">
+                      <label for="meat-icon-sweet"><i class="fas fa-cookie"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-vegetable" class="icon-option" value="fas fa-leaf">
+                      <label for="meat-icon-vegetable"><i class="fas fa-leaf"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-pizza" class="icon-option" value="fas fa-pizza-slice">
+                      <label for="meat-icon-pizza"><i class="fas fa-pizza-slice"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-bread" class="icon-option" value="fas fa-bread-slice">
+                      <label for="meat-icon-bread"><i class="fas fa-bread-slice"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-spicy" class="icon-option" value="fas fa-pepper-hot">
+                      <label for="meat-icon-spicy"><i class="fas fa-pepper-hot"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-herbs" class="icon-option" value="fas fa-seedling">
+                      <label for="meat-icon-herbs"><i class="fas fa-seedling"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-breakfast" class="icon-option" value="fas fa-egg">
+                      <label for="meat-icon-breakfast"><i class="fas fa-egg"></i></label>
+                      
+                      <input type="radio" name="meatIcon" id="meat-icon-fruit" class="icon-option" value="fas fa-apple-alt">
+                      <label for="meat-icon-fruit"><i class="fas fa-apple-alt"></i></label>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="meat-name">Menu Item Name</label>
+                    <input type="text" id="meat-name" class="edit-menu-item-name" value="Lahm bi Ajeen" placeholder="Menu Item Name" />
+                  </div>
+                  
+                  <!-- Keep the hidden dropdown for compatibility with existing JS -->
+                  <select class="edit-menu-item-icon" style="display: none;">
+                    <option value="fas fa-cheese">Cheese</option>
+                    <option value="fas fa-drumstick-bite">Meat</option>
+                    <option value="fas fa-cookie">Sweet</option>
+                    <option value="fas fa-leaf">Vegetable</option>
+                    <option value="fas fa-pizza-slice">Pizza</option>
+                    <option value="fas fa-bread-slice">Bread</option>
+                    <option value="fas fa-pepper-hot">Spicy</option>
+                    <option value="fas fa-seedling">Herbs</option>
+                    <option value="fas fa-egg">Breakfast</option>
+                    <option value="fas fa-apple-alt">Fruit</option>
+                  </select>
+                </div>
+                <div class="form-row buttons-row">
+                  <button class="save-edit-button add-item-button">
+                    <i class="fas fa-save"></i> Save Changes
+                  </button>
+                  <button class="cancel-edit-button remove-item-button">
+                    <i class="fas fa-times"></i> Cancel
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div id="cheeseProportionError" style="color: red; display: none">
-              Total cheese percentage must equal 100%
-            </div>
-            <div id="cheeseResult" class="servings-info"></div>
-          </div>
-        </div>
-
-        <div class="calculator-section">
-          <h2 class="section-title">
-            <i class="fas fa-drumstick-bite"></i> Lahm bi Ajeen (Meat Topping)
-          </h2>
-          <div class="topping-card">
-            <h4>Lahm bi Ajeen</h4>
-            <div class="controls">
-              <div class="control-group">
-                <label for="meatServings">Number of Manakish:</label>
-                <input
-                  type="number"
-                  id="meatServings"
-                  value="8"
-                  min="1"
-                  max="100"
-                />
-              </div>
-              <div class="control-group">
-                <label for="meatPerPiece">Meat Mix per Piece (g):</label>
-                <input
-                  type="number"
-                  id="meatPerPiece"
-                  value="50"
-                  min="20"
-                  max="100"
-                />
-              </div>
-            </div>
-            <hr class="dotted-divider" />
-            <h4>Meat Mix Ingredients</h4>
-
-            <div id="meat-ingredients-container">
-              <table id="meat-ingredients-table">
-                <thead>
-                  <tr>
-                    <th>Ingredient</th>
-                    <th>Amount (g)</th>
-                    <th class="price-column">Price/kg</th>
-                    <th class="price-column">Cost</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Ground Beef/Lamb</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="500"
-                        min="100"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="15"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$7.50</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Onion</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="200"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="1.5"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.30</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Tomato</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="150"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="2"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.30</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Seven Spices</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="5"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="30"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.15</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Salt</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="5"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="0.8"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.00</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Black Pepper</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="3"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="20"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.06</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Pomegranate Molasses</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="15"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="10"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.15</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Tahini</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="meat-ingredient-amount"
-                        value="10"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="8"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.08</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr class="total-row">
-                    <td>Total Mix</td>
-                    <td id="meatMixWeight">888g</td>
-                    <td class="price-column"></td>
-                    <td class="price-column" id="meatMixCost">$8.54</td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style="margin-top: 10px">
-                <button id="addMeatIngredient" class="add-item-button">
-                  <i class="fas fa-plus"></i> Add Ingredient
-                </button>
-              </div>
-
-              <div
-                id="meatIngredientForm"
-                style="display: none; margin-top: 15px"
-              >
-                <div class="custom-ingredient-row">
-                  <input
-                    type="text"
-                    id="meatIngredientName"
-                    class="custom-ingredient-name"
-                    placeholder="Ingredient Name"
-                  />
-                  <input
-                    type="number"
-                    id="meatIngredientAmount"
-                    class="custom-ingredient-weight"
-                    placeholder="Amount (g)"
-                    min="0"
-                  />
-                  <input
-                    type="number"
-                    id="meatIngredientPrice"
-                    class="custom-ingredient-price price-input"
-                    placeholder="Price/kg"
-                    min="0"
-                    step="0.1"
-                  />
-                  <button id="saveMeatIngredient" class="add-item-button">
-                    Add
-                  </button>
-                  <button id="cancelMeatIngredient" class="remove-item-button">
-                    Cancel
-                  </button>
+              
+              <div class="topping-card">
+                <div class="controls">
+                  <div class="control-group">
+                    <label for="meatServings">Number of Manakish:</label>
+                    <input
+                      type="number"
+                      id="meatServings"
+                      value="8"
+                      min="1"
+                      max="100"
+                    />
+                  </div>
                 </div>
-              </div>
-            </div>
+                <hr class="dotted-divider" />
+                <h4>Meat Mix Ingredients</h4>
 
-            <div id="meatResult" class="servings-info"></div>
-          </div>
-        </div>
+                <div id="meat-ingredients-container">
+                  <table id="meat-ingredients-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Per Manakish (g)</th>
+                        <th>Total Amount (g)</th>
+                        <th class="price-column">Price/kg</th>
+                        <th class="price-column">Total Cost</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Ground Beef/Lamb</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="50"
+                            min="10"
+                          />
+                        </td>
+                        <td class="meat-total-amount">400g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="15"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$6.00</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Onion</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="20"
+                            min="0"
+                          />
+                        </td>
+                        <td class="meat-total-amount">160g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="1.5"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.24</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Tomato</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="15"
+                            min="0"
+                          />
+                        </td>
+                        <td class="meat-total-amount">120g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="2"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.24</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Seven Spices</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="0.5"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="meat-total-amount">4g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="30"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.12</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Salt</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="0.5"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="meat-total-amount">4g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="0.8"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.00</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Black Pepper</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="0.3"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="meat-total-amount">2.4g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="20"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.05</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Pomegranate Molasses</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="1.5"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="meat-total-amount">12g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="10"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.12</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Tahini</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="meat-ingredient-amount"
+                            value="1"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="meat-total-amount">8g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="8"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.06</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr class="total-row">
+                        <td>Total</td>
+                        <td></td>
+                        <td class="meat-total-amount" id="meatMixWeight">710.4g</td>
+                        <td class="price-column"></td>
+                        <td class="price-column" id="meatMixCost">$6.83</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-        <div class="calculator-section">
-          <h2 class="section-title">
-            <i class="fas fa-cookie"></i> Chocolate Banana
-          </h2>
-          <div class="topping-card">
-            <h4>Chocolate Banana Manakish</h4>
-            <div class="controls">
-              <div class="control-group">
-                <label for="bananaServings">Number of Manakish:</label>
-                <input
-                  type="number"
-                  id="bananaServings"
-                  value="8"
-                  min="1"
-                  max="100"
-                />
-              </div>
-              <div class="control-group">
-                <label for="bananaPerPiece">Topping per Piece (g):</label>
-                <input
-                  type="number"
-                  id="bananaPerPiece"
-                  value="50"
-                  min="20"
-                  max="100"
-                />
-              </div>
-            </div>
-            <hr class="dotted-divider" />
-            <h4>Chocolate Banana Mix</h4>
+                  <div style="margin-top: 10px">
+                    <button id="addMeatIngredient" class="add-item-button">
+                      <i class="fas fa-plus"></i> Add Ingredient
+                    </button>
+                  </div>
 
-            <div id="banana-ingredients-container">
-              <table id="banana-ingredients-table">
-                <thead>
-                  <tr>
-                    <th>Ingredient</th>
-                    <th>Amount (g)</th>
-                    <th class="price-column">Price/kg</th>
-                    <th class="price-column">Cost</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Chocolate Spread</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="banana-ingredient-amount"
-                        value="300"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="10"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$3.00</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Bananas</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="banana-ingredient-amount"
-                        value="200"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="2"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$0.40</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Crushed Hazelnuts</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="banana-ingredient-amount"
-                        value="50"
-                        min="0"
-                      />
-                    </td>
-                    <td class="price-column">
-                      <input
-                        type="number"
-                        class="price-input"
-                        value="20"
-                        min="0"
-                        step="0.1"
-                      />
-                    </td>
-                    <td class="price-column price-display">$1.00</td>
-                    <td>
-                      <button class="remove-item-button">
-                        <i class="fa fa-trash"></i>
-                      </button>
-                    </td>
-                  </tr>
-                  <tr class="total-row">
-                    <td>Total Mix</td>
-                    <td id="bananaMixWeight">550g</td>
-                    <td class="price-column"></td>
-                    <td class="price-column" id="bananaMixCost">$4.40</td>
-                    <td></td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style="margin-top: 10px">
-                <button id="addBananaIngredient" class="add-item-button">
-                  <i class="fas fa-plus"></i> Add Ingredient
-                </button>
-              </div>
-
-              <div
-                id="bananaIngredientForm"
-                style="display: none; margin-top: 15px"
-              >
-                <div class="custom-ingredient-row">
-                  <input
-                    type="text"
-                    id="bananaIngredientName"
-                    class="custom-ingredient-name"
-                    placeholder="Ingredient Name"
-                  />
-                  <input
-                    type="number"
-                    id="bananaIngredientAmount"
-                    class="custom-ingredient-weight"
-                    placeholder="Amount (g)"
-                    min="0"
-                  />
-                  <input
-                    type="number"
-                    id="bananaIngredientPrice"
-                    class="custom-ingredient-price price-input"
-                    placeholder="Price/kg"
-                    min="0"
-                    step="0.1"
-                  />
-                  <button id="saveBananaIngredient" class="add-item-button">
-                    Add
-                  </button>
-                  <button
-                    id="cancelBananaIngredient"
-                    class="remove-item-button"
+                  <div
+                    id="meatIngredientForm"
+                    style="display: none; margin-top: 15px"
                   >
-                    Cancel
-                  </button>
+                    <div class="custom-ingredient-row">
+                      <input
+                        type="text"
+                        id="meatIngredientName"
+                        class="custom-ingredient-name"
+                        placeholder="Ingredient Name"
+                      />
+                      <input
+                        type="number"
+                        id="meatIngredientAmount"
+                        class="custom-ingredient-weight"
+                        placeholder="Amount (g)"
+                        min="0"
+                      />
+                      <input
+                        type="number"
+                        id="meatIngredientPrice"
+                        class="custom-ingredient-price price-input"
+                        placeholder="Price/kg"
+                        min="0"
+                        step="0.1"
+                      />
+                      <button id="saveMeatIngredient" class="add-item-button">
+                        Add
+                      </button>
+                      <button id="cancelMeatIngredient" class="remove-item-button">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                <div id="meatResult" class="servings-info"></div>
               </div>
             </div>
 
-            <div id="bananaResult" class="servings-info"></div>
-          </div>
-        </div>
+            <!-- Banana Section -->
+            <div class="calculator-section menu-item-section" data-menu-item="banana">
+              <div class="section-header">
+                <h2 class="section-title">
+                  <i class="fas fa-cookie"></i> Chocolate Banana
+                </h2>
+                <div class="section-header-buttons">
+                  <button class="edit-menu-item-button"><i class="fa fa-pen"></i></button>
+                  <button class="remove-menu-item-button"><i class="fa fa-trash"></i></button>
+                </div>
+              </div>
+              
+              <div class="edit-menu-item-form">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Select Icon</label>
+                    <div class="icon-selector-container">
+                      <input type="radio" name="bananaIcon" id="banana-icon-cheese" class="icon-option" value="fas fa-cheese">
+                      <label for="banana-icon-cheese"><i class="fas fa-cheese"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-meat" class="icon-option" value="fas fa-drumstick-bite">
+                      <label for="banana-icon-meat"><i class="fas fa-drumstick-bite"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-sweet" class="icon-option" value="fas fa-cookie" checked>
+                      <label for="banana-icon-sweet"><i class="fas fa-cookie"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-vegetable" class="icon-option" value="fas fa-leaf">
+                      <label for="banana-icon-vegetable"><i class="fas fa-leaf"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-pizza" class="icon-option" value="fas fa-pizza-slice">
+                      <label for="banana-icon-pizza"><i class="fas fa-pizza-slice"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-bread" class="icon-option" value="fas fa-bread-slice">
+                      <label for="banana-icon-bread"><i class="fas fa-bread-slice"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-spicy" class="icon-option" value="fas fa-pepper-hot">
+                      <label for="banana-icon-spicy"><i class="fas fa-pepper-hot"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-herbs" class="icon-option" value="fas fa-seedling">
+                      <label for="banana-icon-herbs"><i class="fas fa-seedling"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-breakfast" class="icon-option" value="fas fa-egg">
+                      <label for="banana-icon-breakfast"><i class="fas fa-egg"></i></label>
+                      
+                      <input type="radio" name="bananaIcon" id="banana-icon-fruit" class="icon-option" value="fas fa-apple-alt">
+                      <label for="banana-icon-fruit"><i class="fas fa-apple-alt"></i></label>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group">
+                    <label for="banana-name">Menu Item Name</label>
+                    <input type="text" id="banana-name" class="edit-menu-item-name" value="Chocolate Banana" placeholder="Menu Item Name" />
+                  </div>
+                  
+                  <!-- Keep the hidden dropdown for compatibility with existing JS -->
+                  <select class="edit-menu-item-icon" style="display: none;">
+                    <option value="fas fa-cheese">Cheese</option>
+                    <option value="fas fa-drumstick-bite">Meat</option>
+                    <option value="fas fa-cookie">Sweet</option>
+                    <option value="fas fa-leaf">Vegetable</option>
+                    <option value="fas fa-pizza-slice">Pizza</option>
+                    <option value="fas fa-bread-slice">Bread</option>
+                    <option value="fas fa-pepper-hot">Spicy</option>
+                    <option value="fas fa-seedling">Herbs</option>
+                    <option value="fas fa-egg">Breakfast</option>
+                    <option value="fas fa-apple-alt">Fruit</option>
+                  </select>
+                </div>
+                <div class="form-row buttons-row">
+                  <button class="save-edit-button add-item-button">
+                    <i class="fas fa-save"></i> Save Changes
+                  </button>
+                  <button class="cancel-edit-button remove-item-button">
+                    <i class="fas fa-times"></i> Cancel
+                  </button>
+                </div>
+              </div>
+              
+              <div class="topping-card">
+                <div class="controls">
+                  <div class="control-group">
+                    <label for="bananaServings">Number of Manakish:</label>
+                    <input
+                      type="number"
+                      id="bananaServings"
+                      value="8"
+                      min="1"
+                      max="100"
+                    />
+                  </div>
+                </div>
+                <hr class="dotted-divider" />
+                <h4>Chocolate Banana Mix</h4>
 
-        <div class="recipe-actions">
-          <button id="shareToppings" class="share-button">
-            <i class="fas fa-share-alt"></i> Share Toppings
-          </button>
-          <button id="copyToppings" class="copy-button">
-            <i class="fas fa-copy"></i> Copy Toppings
-          </button>
-          <button id="printToppings" class="print-button">
-            <i class="fas fa-print"></i> Print Toppings
-          </button>
+                <div id="banana-ingredients-container">
+                  <table id="banana-ingredients-table">
+                    <thead>
+                      <tr>
+                        <th>Ingredient</th>
+                        <th>Per Manakish (g)</th>
+                        <th>Total Amount (g)</th>
+                        <th class="price-column">Price/kg</th>
+                        <th class="price-column">Total Cost</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Chocolate Spread</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="banana-ingredient-amount"
+                            value="30"
+                            min="0"
+                          />
+                        </td>
+                        <td class="banana-total-amount">240g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="10"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$2.40</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Bananas</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="banana-ingredient-amount"
+                            value="20"
+                            min="0"
+                          />
+                        </td>
+                        <td class="banana-total-amount">160g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="2"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.32</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Crushed Hazelnuts</td>
+                        <td>
+                          <input
+                            type="number"
+                            class="banana-ingredient-amount"
+                            value="5"
+                            min="0"
+                          />
+                        </td>
+                        <td class="banana-total-amount">40g</td>
+                        <td class="price-column">
+                          <input
+                            type="number"
+                            class="price-input"
+                            value="20"
+                            min="0"
+                            step="0.1"
+                          />
+                        </td>
+                        <td class="price-column price-display">$0.80</td>
+                        <td>
+                          <button class="remove-item-button">
+                            <i class="fa fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                      <tr class="total-row">
+                        <td>Total</td>
+                        <td></td>
+                        <td class="banana-total-amount" id="bananaMixWeight">440g</td>
+                        <td class="price-column"></td>
+                        <td class="price-column" id="bananaMixCost">$3.52</td>
+                        <td></td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div style="margin-top: 10px">
+                    <button id="addBananaIngredient" class="add-item-button">
+                      <i class="fas fa-plus"></i> Add Ingredient
+                    </button>
+                  </div>
+
+                  <div
+                    id="bananaIngredientForm"
+                    style="display: none; margin-top: 15px"
+                  >
+                    <div class="custom-ingredient-row">
+                      <input
+                        type="text"
+                        id="bananaIngredientName"
+                        class="custom-ingredient-name"
+                        placeholder="Ingredient Name"
+                      />
+                      <input
+                        type="number"
+                        id="bananaIngredientAmount"
+                        class="custom-ingredient-weight"
+                        placeholder="Amount (g)"
+                        min="0"
+                      />
+                      <input
+                        type="number"
+                        id="bananaIngredientPrice"
+                        class="custom-ingredient-price price-input"
+                        placeholder="Price/kg"
+                        min="0"
+                        step="0.1"
+                      />
+                      <button id="saveBananaIngredient" class="add-item-button">
+                        Add
+                      </button>
+                      <button
+                        id="cancelBananaIngredient"
+                        class="remove-item-button"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="bananaResult" class="servings-info"></div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div id="shareToppingsModal" class="modal">
