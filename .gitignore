@@ -4,7 +4,7 @@ node_modules/
 .pnp.js
 
 # Build
-dist/
+# dist/ - kept for GitHub Pages deployment
 build/
 
 # Testing
