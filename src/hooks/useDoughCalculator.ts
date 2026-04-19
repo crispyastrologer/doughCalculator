@@ -457,24 +457,17 @@ const totalToppingCost = menuItems.reduce((sum, item) => sum + getMenuItemCost(i
       try {
         const json = decodeURIComponent(atob(encoded))
         const state = JSON.parse(json)
-        const recipe = {
-          ingredients: state.i ? state.i.map((ing: any, idx: number) => ({
+        if (state.i) {
+          setIngredients(state.i.map((ing: any, idx: number) => ({
             id: String(idx + 1),
             name: ing.n,
             weight: ing.w,
             type: ing.t || 'extras',
             pricePerKg: ing.p || 0,
-          })) : [],
-          numBalls: state.b || 8,
-          ballWeight: state.bw || 107,
-          menuItems: state.m || [],
+          })))
         }
-        // Save to localStorage so it persists on refresh
-        localStorage.setItem('edeina-recipe', JSON.stringify(recipe))
-        // Load the recipe
-        if (recipe.ingredients.length > 0) setIngredients(recipe.ingredients)
-        setNumBalls(recipe.numBalls)
-        setBallWeight(recipe.ballWeight)
+        if (state.b !== undefined) setNumBalls(state.b)
+        if (state.bw !== undefined) setBallWeight(state.bw)
         if (state.m && state.m.length > 0) {
           setMenuItems(prev => {
             const updated = [...prev]
@@ -508,7 +501,8 @@ const totalToppingCost = menuItems.reduce((sum, item) => sum + getMenuItemCost(i
             return updated
           })
         }
-        // Keep URL for refresh - don't clear it
+        // Clean URL after loading
+        window.history.replaceState({}, '', window.location.pathname)
         return true
       } catch {
         return false
