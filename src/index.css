@@ -8,7 +8,7 @@
   --color-brand-gold-hover: #C58B30;
   
   --font-family-primary: 'Plus Jakarta Sans', sans-serif;
-  --font-family-secondary: 'Josefin Slab', serif;
+  --font-family-secondary: 'Plus Jakarta Sans', sans-serif;
   --font-family-accent: 'Brittania', cursive;
 }
 
@@ -201,7 +201,7 @@ input[type="number"]::-webkit-inner-spin-button {
 
 .hero-quote {
   color: var(--text-secondary);
-  font-family: 'Josefin Slab', serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 500;
   font-style: italic;
   max-width: 28rem;
@@ -746,7 +746,7 @@ input[type="number"]::-webkit-inner-spin-button {
 }
 
 .analysis-note {
-  font-family: 'Josefin Slab', serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-style: italic;
   font-size: 0.8rem;
   color: var(--text-muted);
